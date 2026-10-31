@@ -1,24 +1,23 @@
-const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000/api/v1'
+import { apiRequest } from './client'
+import type { DatasetDetail, DatasetSummary } from '../types/api'
 
-export type DatasetSummary = {
-  id: string
-  source_dataset_id: string
-  institute: string
-  created_at: string
-}
+export type { DatasetSummary } from '../types/api'
 
 export async function listDatasets(signal?: AbortSignal): Promise<DatasetSummary[]> {
-  const controller = new AbortController()
-  const timeout = window.setTimeout(() => controller.abort(), 8_000)
-  const abortFromCaller = () => controller.abort()
-  signal?.addEventListener('abort', abortFromCaller, { once: true })
-  if (signal?.aborted) controller.abort()
-  try {
-    const response = await fetch(`${API_URL}/datasets`, { signal: controller.signal })
-    if (!response.ok) throw new Error('Could not load imported datasets')
-    return await response.json() as DatasetSummary[]
-  } finally {
-    window.clearTimeout(timeout)
-    signal?.removeEventListener('abort', abortFromCaller)
-  }
+  return apiRequest<DatasetSummary[]>('/datasets', { signal })
+}
+
+export async function getDataset(datasetId: string, signal?: AbortSignal): Promise<DatasetDetail> {
+  return apiRequest<DatasetDetail>(`/datasets/${datasetId}`, { signal })
+}
+
+export async function uploadDataset(files: File[], replaceExisting = false): Promise<{ dataset_id: string; source_dataset_id: string; counts: Record<string, number> }> {
+  const body = new FormData()
+  files.forEach((file) => body.append('files', file, file.name))
+  body.append('replace_existing', String(replaceExisting))
+  return apiRequest('/datasets/import/upload', { method: 'POST', body })
+}
+
+export async function getDashboardSummary(datasetId: string, signal?: AbortSignal) {
+  return apiRequest<import('../types/api').DashboardSummary>(`/datasets/${datasetId}/summary`, { signal })
 }

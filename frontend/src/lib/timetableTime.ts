@@ -40,10 +40,6 @@ function periodStartMinutes(period: number): number {
   return 14 * 60 + (period - 6) * 60
 }
 
-function periodEndMinutes(period: number): number {
-  return periodStartMinutes(period) + 60
-}
-
 export function formatMinutes(minutes: number): string {
   const hour24 = Math.floor(minutes / 60)
   const minute = minutes % 60
@@ -53,8 +49,9 @@ export function formatMinutes(minutes: number): string {
 }
 
 export function formatSessionTime(session: TimetableSession): string {
+  if (session.timeLabel) return session.timeLabel
   const finalPeriod = session.startPeriod + session.durationPeriods - 1
-  return `${formatMinutes(periodStartMinutes(session.startPeriod))} – ${formatMinutes(periodEndMinutes(finalPeriod))}`
+  return `P${session.startPeriod}–P${finalPeriod}`
 }
 
 export function periodTimeLabel(period: number): string {

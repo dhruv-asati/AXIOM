@@ -2,7 +2,7 @@
 
 ## API and persistence
 
-- `POST /api/v1/datasets/{dataset_id}/schedules/generate` accepts `{"team":"AXIOM","time_limit_seconds":120}` and solves a dataset-specific weekly timetable plus its exam allocations.
+- `POST /api/v1/datasets/{dataset_id}/schedules/generate` accepts `{"team":"AXIOM","time_limit_seconds":120}` and solves a dataset-specific weekly timetable plus its exam allocations. An optional `warm_start_schedule_id` must name a complete schedule from the same dataset; CP-SAT uses it as an incumbent hint while still minimizing the official objective.
 - `GET /api/v1/datasets/{dataset_id}/schedules/{schedule_id}/assignments` returns persisted weekly session assignments.
 - `GET /api/v1/datasets/{dataset_id}/schedules/{schedule_id}/export` returns the official `schedule.json` structure with `team`, source `dataset_id`, all sessions and all exam allocations.
 
@@ -54,3 +54,19 @@ python validator.py --data data/cit_public.json --schedule exports/schedule.json
 ```
 
 The service returns a complete hard-valid solution; validator compatibility is checked independently on the exported JSON.
+
+## Disruption-aware repair
+
+Repair previews use the same CP-SAT hard constraints and official soft objective. The baseline is passed as a warm start, and a separate stability objective favors fewer changed sessions and affected groups. A preview is stored as a `proposed` repair and does not change the source data or baseline schedule. Approval explicitly applies the disruption and stores a new schedule; rejection leaves the schedule and source records intact. A source/baseline fingerprint prevents approval of stale proposals.
+
+Structured workflow:
+
+- `POST /api/v1/datasets/{dataset_id}/schedules/{schedule_id}/repair-proposals` with `{"changes":[...],"time_limit_seconds":60` creates a candidate.
+- `GET /api/v1/datasets/{dataset_id}/repair-proposals` lists proposals for a dataset.
+- `GET /api/v1/datasets/{dataset_id}/schedules/{schedule_id}/repair-proposals/{proposal_id}` fetches one candidate.
+- `POST .../{proposal_id}/approve` applies it and creates a separate schedule.
+- `POST .../{proposal_id}/reject` with `{"reason":"..."}` rejects it.
+
+The integrated text workflow is `POST /api/v1/datasets/{dataset_id}/schedules/{schedule_id}/assistant/disruptions/repair-proposals`, with `{"message":"...","time_limit_seconds":60}`. It runs Siddharth's existing parser first and calls deterministic repair only for a complete structured disruption proposal. Clarification and unsupported responses do not run CP-SAT. The interpretation-only parser remains at `POST /api/v1/assistant/disruptions/parse`.
+
+The proposal persistence requires migration `8c41d892c2aa`. Schedule history also uses `schedules.created_at`, added by `cd9a2f1b7e40`. Review and apply both only in an explicitly selected environment; neither was applied to Supabase during Stage 12. See [TIMETABLE_OPTIMISATION_AUDIT.md](TIMETABLE_OPTIMISATION_AUDIT.md) for solver audit, objective details, workflow semantics, and limitations.

@@ -38,6 +38,7 @@ class Dataset(Base):
     booking_requests: Mapped[list[BookingRequest]] = relationship(back_populates="dataset", cascade="all, delete-orphan")
     examinations: Mapped[list[Examination]] = relationship(back_populates="dataset", cascade="all, delete-orphan")
     schedules: Mapped[list[Schedule]] = relationship(back_populates="dataset", cascade="all, delete-orphan")
+    repair_proposals: Mapped[list[ScheduleRepairProposal]] = relationship(back_populates="dataset", cascade="all, delete-orphan")
 
 
 class DatasetEntity:
@@ -207,6 +208,7 @@ class Schedule(Base):
     dataset_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
     source_id: Mapped[str] = mapped_column(String(160), nullable=False)
     team: Mapped[str] = mapped_column(String(255), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     __table_args__ = (ForeignKeyConstraint(["dataset_id"], ["datasets.id"], ondelete="CASCADE"), UniqueConstraint("dataset_id", "source_id", name="uq_schedules_dataset_source"), UniqueConstraint("id", "dataset_id", name="uq_schedules_id_dataset"))
     dataset: Mapped[Dataset] = relationship(back_populates="schedules")
     assignments: Mapped[list[ScheduleSessionAssignment]] = relationship(back_populates="schedule", viewonly=True)
@@ -289,4 +291,34 @@ class ScheduleOverride(Base):
     __table_args__ = (ForeignKeyConstraint(["schedule_id", "dataset_id"], ["schedules.id", "schedules.dataset_id"], ondelete="CASCADE"), ForeignKeyConstraint(["dataset_id", "session_source_id"], ["timetable_sessions.dataset_id", "timetable_sessions.source_id"], ondelete="CASCADE"), ForeignKeyConstraint(["dataset_id", "room_source_id"], ["rooms.dataset_id", "rooms.source_id"]), Index("ix_schedule_overrides_schedule", "schedule_id"))
     schedule: Mapped[Schedule] = relationship(back_populates="overrides", primaryjoin=lambda: and_(Schedule.dataset_id == ScheduleOverride.dataset_id, Schedule.id == foreign(ScheduleOverride.schedule_id)))
     session: Mapped[TimetableSession] = relationship(primaryjoin=lambda: and_(TimetableSession.dataset_id == ScheduleOverride.dataset_id, TimetableSession.source_id == foreign(ScheduleOverride.session_source_id)))
+
+
+class ScheduleRepairProposal(Base):
+    """Persisted, reviewable timetable repair candidate separate from its baseline."""
+
+    __tablename__ = "schedule_repair_proposals"
+    id = uuid_pk()
+    dataset_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    baseline_schedule_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    approved_schedule_id: Mapped[uuid.UUID | None] = mapped_column(Uuid(as_uuid=True))
+    status: Mapped[str] = mapped_column(String(24), nullable=False, default="proposed")
+    input_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    changes: Mapped[list[dict[str, Any]]] = json_column()
+    assignments: Mapped[list[dict[str, Any]]] = json_column()
+    exam_allocations: Mapped[list[dict[str, Any]]] = json_column()
+    affected_session_ids: Mapped[list[str]] = json_column()
+    changed_session_ids: Mapped[list[str]] = json_column()
+    objective: Mapped[dict[str, Any]] = json_column()
+    explanation: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    __table_args__ = (
+        ForeignKeyConstraint(["dataset_id"], ["datasets.id"], ondelete="CASCADE"),
+        ForeignKeyConstraint(["baseline_schedule_id", "dataset_id"], ["schedules.id", "schedules.dataset_id"], ondelete="CASCADE"),
+        ForeignKeyConstraint(["approved_schedule_id", "dataset_id"], ["schedules.id", "schedules.dataset_id"]),
+        CheckConstraint("status IN ('proposed', 'approved', 'rejected')", name="ck_repair_proposal_status"),
+        Index("ix_repair_proposals_dataset_created", "dataset_id", "created_at"),
+        Index("ix_repair_proposals_baseline_status", "baseline_schedule_id", "status"),
+    )
+    dataset: Mapped[Dataset] = relationship(back_populates="repair_proposals", foreign_keys=[dataset_id])
 

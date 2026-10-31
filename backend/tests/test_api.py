@@ -13,7 +13,7 @@ from app.api.routes import get_db
 from app.database.session import Base
 from app.main import app
 from app.models import (
-    BookingOutcome, BookingRequest, Course, Dataset, Faculty, Room, Schedule,
+    BookingOutcome, BookingRequest, Course, Dataset, ExamRoomAllocation, Examination, Faculty, Room, Schedule,
     ScheduleSessionAssignment, StudentGroup, TimetableSession,
 )
 from app.models.entities import session_groups
@@ -152,6 +152,50 @@ def test_health_cors_docs_openapi_and_dataset_routes(api_client):
     import_operation = paths["/api/v1/datasets/import"]["post"]
     assert import_operation["requestBody"]["content"]["application/json"]["schema"]["$ref"].endswith("/DatasetImportRequest")
     assert import_operation["responses"]["200"]["content"]["application/json"]["schema"]["$ref"].endswith("/DatasetImportResponse")
+    for path in (
+        "/api/v1/datasets/{dataset_id}/summary",
+        "/api/v1/datasets/{dataset_id}/schedules",
+        "/api/v1/datasets/{dataset_id}/rooms",
+        "/api/v1/datasets/{dataset_id}/bookings",
+        "/api/v1/assistant/bookings/parse",
+        "/api/v1/datasets/{dataset_id}/schedules/{schedule_id}/examinations",
+        "/api/v1/datasets/import/upload",
+    ):
+        assert path in paths
+
+
+def test_summary_and_schedule_list_use_bounded_database_round_trips(api_client):
+    client, engine = api_client
+    with Session(engine) as db:
+        dataset, _schedule = add_dataset(db, "query-budget")
+        db.add_all([
+            Schedule(dataset_id=dataset.id, source_id=f"query-budget-{index}", team="API Test")
+            for index in range(4)
+        ])
+        db.commit()
+        dataset_id = dataset.id
+
+    query_counts = {"summary": 0, "schedules": 0}
+    current = "summary"
+
+    def count_query(_conn, _cursor, _statement, _parameters, _context, _executemany):
+        query_counts[current] += 1
+
+    event.listen(engine, "before_cursor_execute", count_query)
+    try:
+        summary = client.get(f"/api/v1/datasets/{dataset_id}/summary")
+        assert summary.status_code == 200
+        current = "schedules"
+        schedules = client.get(f"/api/v1/datasets/{dataset_id}/schedules")
+        assert schedules.status_code == 200
+    finally:
+        event.remove(engine, "before_cursor_execute", count_query)
+
+    assert query_counts["summary"] <= 12
+    assert query_counts["schedules"] <= 3
+    assert summary.json()["counts"]["timetable_sessions"] == 0
+    assert schedules.json()[0]["assignment_count"] == 0
+    assert len(schedules.json()) == 5
 
 
 def test_dataset_import_validation_and_success(api_client, tmp_path, monkeypatch):
@@ -178,9 +222,40 @@ def test_dataset_import_validation_and_success(api_client, tmp_path, monkeypatch
     assert client.post("/api/v1/datasets/import", json={"path": "missing.json"}).status_code == 404
     assert client.post("/api/v1/datasets/import", json={"path": "../outside.json"}).status_code == 400
     assert client.post("/api/v1/datasets/import", json={"path": 7}).status_code == 422
+    duplicate = client.post("/api/v1/datasets/import", json={"path": "mini.json"})
+    assert duplicate.status_code == 409
+    assert duplicate.json()["detail"]["replace_existing_required"] is True
+    replaced = client.post("/api/v1/datasets/import", json={"path": "mini.json", "replace_existing": True})
+    assert replaced.status_code == 200
 
     with Session(engine) as db:
         assert db.scalar(select(func.count()).select_from(Dataset)) == 1
+
+
+def test_multi_file_dataset_upload_and_path_safety(api_client):
+    client, engine = api_client
+    dataset = {
+        "dataset_id": "upload-test", "institute": "Upload Institute",
+        "calendar": {"days": ["MON"], "periods": [{"id": 1, "teaching": True}]},
+        "priority_order": ["exam", "regular_session", "institute_event", "guest_lecture", "department_event", "club_event"],
+        "role_category_cap": {"club": "club_event"},
+        "faculty": [], "courses": [], "student_groups": [], "rooms": [], "sessions": [],
+        "booking_requests": [], "room_unavailability": [], "cancellations": [], "exams": [],
+    }
+    dataset.pop("faculty")
+    payload = [
+        ("files", ("dataset.json", json.dumps(dataset), "application/json")),
+        ("files", ("faculty.csv", "id,name,department,max_hours_per_day,needs_accessible,unavailable,preferences\nF1,Faculty,CSE,8,false,[],[]\n", "text/csv")),
+    ]
+    response = client.post("/api/v1/datasets/import/upload", files=payload)
+    assert response.status_code == 200, response.text
+    assert response.json()["counts"]["faculty"] == 1
+    duplicate = client.post("/api/v1/datasets/import/upload", files=payload)
+    assert duplicate.status_code == 409
+    replacement = client.post("/api/v1/datasets/import/upload", files=payload, data={"replace_existing": "true"})
+    assert replacement.status_code == 200
+    unsafe = client.post("/api/v1/datasets/import/upload", files=[("files", ("../escape.json", json.dumps(dataset), "application/json"))])
+    assert unsafe.status_code == 400
 
 
 def test_timetable_generation_assignments_export_and_isolation(api_client):
@@ -202,6 +277,16 @@ def test_timetable_generation_assignments_export_and_isolation(api_client):
             department="CSE", size=30, needs_accessible=False,
         )
         db.add_all([faculty, course, group])
+        second_room = Room(
+            dataset_id=dataset.id, source_id="R2", name="Test Room 2", building="Main",
+            type="classroom", capacity=100, features=[], accessible=True,
+            allowed_uses=["lecture", "event", "exam"],
+        )
+        exam = Examination(
+            dataset_id=dataset.id, source_id="EX-1", course_ids=["C1"],
+            group_ids=["G1"], size=90, duration_hours=2,
+        )
+        db.add_all([second_room, exam])
         db.flush()
         session = TimetableSession(
             dataset_id=dataset.id, source_id="S1", course_source_id=course.source_id,
@@ -228,11 +313,42 @@ def test_timetable_generation_assignments_export_and_isolation(api_client):
     assert assignments.status_code == 200
     assert assignments.json()["status"] == "complete"
     assert assignments.json()["assignments"][0]["session_id"] == "S1"
+    assert assignments.json()["assignments"][0]["course_name"] == "Course"
+    assert assignments.json()["assignments"][0]["faculty_name"] == "Faculty"
+    assert assignments.json()["assignments"][0]["student_groups"] == [{"id": "G1", "name": "Group"}]
+    assert assignments.json()["assignments"][0]["end_period"] == assignments.json()["assignments"][0]["start_period"]
     export = client.get(f"/api/v1/datasets/{dataset_id}/schedules/{schedule_id}/export")
     assert export.status_code == 200
     assert export.json()["dataset_id"] == "solver-target"
     assert export.json()["sessions"][0]["room_id"] == expected_room_id
-    assert export.json()["exams"] == []
+    assert len(export.json()["exams"]) == 1
+    assert len(export.json()["exams"][0]["rooms"]) == 2
+
+    schedules = client.get(f"/api/v1/datasets/{dataset_id}/schedules")
+    assert schedules.status_code == 200 and schedules.json()[0]["schedule_id"] == schedule_id
+    assert schedules.json()[0]["status"] == "complete"
+    detail = client.get(f"/api/v1/datasets/{dataset_id}/schedules/{schedule_id}")
+    assert detail.status_code == 200 and detail.json()["created_at"]
+    assert client.get(f"/api/v1/datasets/{dataset_id}/schedule-history").status_code == 200
+    exams = client.get(f"/api/v1/datasets/{dataset_id}/schedules/{schedule_id}/examinations")
+    assert exams.status_code == 200
+    assert len(exams.json()["examinations"][0]["rooms"]) == 2
+    assert exams.json()["examinations"][0]["effective_allocated_capacity"] >= 90
+    assignment = assignments.json()["assignments"][0]
+    rooms = client.get(
+        f"/api/v1/datasets/{dataset_id}/rooms",
+        params={"schedule_id": schedule_id, "day": assignment["day"], "period": assignment["start_period"]},
+    )
+    assert rooms.status_code == 200
+    room_by_id = {row["room_id"]: row for row in rooms.json()}
+    assert room_by_id[assignment["room_id"]]["availability"] == "occupied"
+    assert room_by_id[assignment["room_id"]]["utilization_percent"] is not None
+    dashboard = client.get(f"/api/v1/datasets/{dataset_id}/summary")
+    assert dashboard.status_code == 200
+    assert dashboard.json()["counts"]["timetable_sessions"] == 1
+    assert dashboard.json()["counts"]["examinations"] == 1
+    assert dashboard.json()["latest_schedule"]["schedule_id"] == schedule_id
+    assert dashboard.json()["room_utilisation_percent"] is not None
 
     assert client.get(f"/api/v1/datasets/{other_dataset_id}/schedules/{schedule_id}/assignments").status_code == 404
     assert client.get(f"/api/v1/datasets/{other_dataset_id}/schedules/{schedule_id}/export").status_code == 404
@@ -263,6 +379,11 @@ def test_booking_execution_outcome_retrieval_and_cross_dataset_protection(api_cl
     assert repeated.status_code == 200
     outcomes = client.get(f"/api/v1/datasets/{dataset_id}/schedules/{schedule_id}/booking-outcomes")
     assert outcomes.json() == first.json()
+    booking_records = client.get(f"/api/v1/datasets/{dataset_id}/bookings", params={"schedule_id": schedule_id})
+    assert booking_records.status_code == 200
+    assert booking_records.json()[0]["title"] == "Test event"
+    assert booking_records.json()[0]["effective_category"] == "club_event"
+    assert booking_records.json()[0]["reason"]
     with Session(engine) as db:
         assert db.scalar(select(func.count()).select_from(BookingOutcome).where(
             BookingOutcome.dataset_id == dataset_id,
@@ -272,3 +393,34 @@ def test_booking_execution_outcome_retrieval_and_cross_dataset_protection(api_cl
     assert client.get(f"/api/v1/datasets/{other_id}/schedules/{schedule_id}/booking-outcomes").status_code == 404
     assert client.get(f"/api/v1/datasets/{dataset_id}/schedules/{other_schedule_id}/booking-outcomes").status_code == 404
     assert client.post(f"/api/v1/datasets/not-a-uuid/schedules/{schedule_id}/bookings/run").status_code == 422
+
+
+def test_booking_parser_and_reviewed_intake_api(api_client):
+    client, engine = api_client
+    with Session(engine) as db:
+        dataset, _ = add_dataset(db, "booking-intake", with_schedule=False)
+        dataset_id = dataset.id
+        db.commit()
+
+    parsed = client.post("/api/v1/assistant/bookings/parse", json={
+        "message": "Requester: Robotics Club, role: club, department: CSE, title: Robotics Contest. Need a classroom Thursday 6 to 7 pm for 30 participants, 1 hour.",
+        "requester": {"requester": "Robotics Club", "role": "club", "department": "CSE"},
+    })
+    assert parsed.status_code == 200
+    assert parsed.json()["status"] == "proposal_ready"
+    assert parsed.json()["proposal"]["type"] == "booking"
+
+    payload = parsed.json()["proposal"]["data"]
+    payload["requested_category"] = "club_event"
+    create = client.post(f"/api/v1/datasets/{dataset_id}/booking-requests", json={
+        "data": payload, "raw_text": "Robotics Club event", "source_id": "web-idempotency-key-1",
+    })
+    assert create.status_code == 201, create.text
+    assert create.json()["status"] == "pending"
+    assert create.json()["priority_rank"] == 6
+    duplicate = client.post(f"/api/v1/datasets/{dataset_id}/booking-requests", json={
+        "data": payload, "raw_text": "retry", "source_id": "web-idempotency-key-1",
+    })
+    assert duplicate.status_code == 409
+    listed = client.get(f"/api/v1/datasets/{dataset_id}/bookings")
+    assert listed.status_code == 200 and len(listed.json()) == 1

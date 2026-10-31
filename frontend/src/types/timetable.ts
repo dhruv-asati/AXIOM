@@ -1,6 +1,6 @@
 export const timetableDays = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'] as const
 
-export type TimetableDay = (typeof timetableDays)[number]
+export type TimetableDay = string
 export type SessionKind = 'lecture' | 'tutorial' | 'lab' | 'other'
 
 /** Frontend display model. This is not the unresolved backend response schema. */
@@ -25,6 +25,7 @@ export type TimetableSession = {
   roomName: string
   studentGroups: Array<{ id: string; name: string }>
   kind: SessionKind
+  timeLabel?: string
   /** Populated only from official solver/backend diagnostics after a contract is agreed. */
   conflicts?: TimetableConflict[]
 }

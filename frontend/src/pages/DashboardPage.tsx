@@ -1,249 +1,118 @@
-import { useCallback, useEffect, useState } from 'react'
-import {
-  Activity,
-  ArrowUpRight,
-  Building2,
-  CalendarDays,
-  CalendarRange,
-  ChartNoAxesCombined,
-  Clock3,
-  DoorOpen,
-  LoaderCircle,
-  RefreshCw,
-  ShieldAlert,
-  TicketCheck,
-  UsersRound,
-} from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Activity, AlertCircle, ArrowUpRight, CalendarDays, ChartNoAxesCombined, DoorOpen, LoaderCircle, RefreshCw, TicketCheck } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { checkApiHealth } from '../api/health'
-import { listDatasets, type DatasetSummary } from '../api/datasets'
-
-const metrics = [
-  { label: 'Total rooms', icon: Building2, note: 'Room data contract pending' },
-  { label: 'Active bookings', icon: TicketCheck, note: 'Booking data contract pending' },
-  { label: 'Pending booking requests', icon: CalendarDays, note: 'Booking data contract pending' },
-  { label: 'Room utilisation', icon: ChartNoAxesCombined, note: 'Utilisation data contract pending' },
-]
-
-const quickActions = [
-  { label: 'View Timetable', description: 'Classes and sessions', to: '/timetable', icon: CalendarRange },
-  { label: 'Manage Rooms', description: 'Spaces and venues', to: '/rooms', icon: DoorOpen },
-  { label: 'Review Bookings', description: 'Requests and decisions', to: '/bookings', icon: TicketCheck },
-  { label: 'Manage Examinations', description: 'Exam coordination', to: '/examinations', icon: UsersRound },
-  { label: 'View Disruptions', description: 'Schedule changes', to: '/disruptions', icon: ShieldAlert },
-]
-
-type ApiState = 'checking' | 'available' | 'unavailable'
-type DatasetState = 'loading' | 'loaded' | 'error'
-
-function MetricCard({ label, note, icon: Icon }: (typeof metrics)[number]) {
-  return (
-    <article className="dashboard-metric-card">
-      <div className="dashboard-metric-top">
-        <span className="dashboard-metric-icon"><Icon size={18} strokeWidth={1.7} aria-hidden="true" /></span>
-        <span className="metric-unavailable-label">Unavailable</span>
-      </div>
-      <p className="dashboard-metric-label">{label}</p>
-      <div className="dashboard-metric-value" aria-label={`${label}: unavailable`}>—</div>
-      <p className="dashboard-metric-note">{note}</p>
-    </article>
-  )
-}
-
-function EmptyDataState({ title, detail }: { title: string; detail: string }) {
-  return (
-    <div className="dashboard-empty-state">
-      <span className="dashboard-empty-icon"><Activity size={18} strokeWidth={1.7} aria-hidden="true" /></span>
-      <strong>{title}</strong>
-      <span>{detail}</span>
-    </div>
-  )
-}
+import { getDashboardSummary } from '../api/datasets'
+import { listBookings } from '../api/resources'
+import { invalidateApiCache } from '../api/client'
+import { SkeletonCard, SkeletonPage, SkeletonStats, SkeletonTable } from '../components/ui/Skeleton'
+import { useDatasetContext } from '../context/DatasetContext'
+import type { BookingRequestRecord, DashboardSummary } from '../types/api'
+import { PageHeader } from '../components/layout/PageHeader'
+import './Operations.css'
 
 export function DashboardPage() {
-  const [apiState, setApiState] = useState<ApiState>('checking')
-  const [datasetState, setDatasetState] = useState<DatasetState>('loading')
-  const [datasets, setDatasets] = useState<DatasetSummary[]>([])
-  const [lastChecked, setLastChecked] = useState<Date | null>(null)
+  const { datasets, selectedDatasetId, selectedDataset, loading: datasetsLoading, error: datasetsError, refresh: refreshDatasets, selectDataset } = useDatasetContext()
+  const [apiAvailable, setApiAvailable] = useState<boolean | null>(null)
+  const [summary, setSummary] = useState<DashboardSummary | null>(null)
+  const [bookings, setBookings] = useState<BookingRequestRecord[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [loadedDatasetId, setLoadedDatasetId] = useState('')
+  const requestController = useRef<AbortController | null>(null)
 
-  const refreshConnection = useCallback(async (signal?: AbortSignal) => {
-    setApiState('checking')
-    setDatasetState('loading')
-    try {
-      await checkApiHealth(signal)
-      if (signal?.aborted) return
-      setApiState('available')
-    } catch {
-      if (signal?.aborted) return
-      setApiState('unavailable')
-      setDatasetState('error')
-      setDatasets([])
-      setLastChecked(new Date())
+  const refresh = useCallback(async () => {
+    requestController.current?.abort()
+    const controller = new AbortController()
+    requestController.current = controller
+    setLoading(true)
+    setError('')
+    if (!selectedDatasetId) {
+      setSummary(null)
+      setBookings([])
+      setLoadedDatasetId('')
+      setLoading(false)
       return
     }
+    invalidateApiCache(`/datasets/${selectedDatasetId}`)
     try {
-      const result = await listDatasets(signal)
-      if (signal?.aborted) return
-      setDatasets(result)
-      setDatasetState('loaded')
-    } catch {
-      if (signal?.aborted) return
-      setDatasets([])
-      setDatasetState('error')
+      const [stats, requests] = await Promise.all([
+        getDashboardSummary(selectedDatasetId, controller.signal),
+        listBookings(selectedDatasetId, undefined, controller.signal),
+      ])
+      if (controller.signal.aborted) return
+      setSummary(stats)
+      setBookings(requests.slice(0, 5))
+      setLoadedDatasetId(selectedDatasetId)
+      setApiAvailable(true)
+    } catch (cause) {
+      if (controller.signal.aborted) return
+      setApiAvailable(false)
+      setError(cause instanceof Error ? cause.message : 'Dashboard data could not be loaded')
+      setLoadedDatasetId(selectedDatasetId)
     } finally {
-      if (!signal?.aborted) setLastChecked(new Date())
+      if (!controller.signal.aborted) setLoading(false)
     }
-  }, [])
+  }, [selectedDatasetId])
 
   useEffect(() => {
-    const controller = new AbortController()
-    void refreshConnection(controller.signal)
-    return () => controller.abort()
-  }, [refreshConnection])
+    void refresh()
+    return () => requestController.current?.abort()
+  }, [refresh])
 
-  const today = new Intl.DateTimeFormat('en-IN', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  }).format(new Date())
+  const currentSummary = loadedDatasetId === selectedDatasetId ? summary : null
+  const currentBookings = loadedDatasetId === selectedDatasetId ? bookings : []
 
-  return (
-    <div className="campus-dashboard">
-      <header className="dashboard-page-header">
-        <div>
-          <p className="page-eyebrow">CAMPUS OPERATIONS</p>
-          <h1>Campus Overview</h1>
-          <p className="page-description">Monitor the spaces, bookings, and schedules that keep campus operations moving.</p>
-        </div>
-        <div className="dashboard-header-tools">
-          <div className="dashboard-date"><CalendarDays size={16} strokeWidth={1.7} aria-hidden="true" /><span>{today}</span></div>
-          <button
-            className="dashboard-refresh-button"
-            type="button"
-            onClick={() => void refreshConnection()}
-            disabled={apiState === 'checking'}
-          >
-            {apiState === 'checking'
-              ? <LoaderCircle size={15} className="is-spinning" aria-hidden="true" />
-              : <RefreshCw size={15} aria-hidden="true" />}
-            <span>{apiState === 'checking' ? 'Checking' : 'Refresh'}</span>
-          </button>
-        </div>
-      </header>
+  const stats = currentSummary?.counts
+  const cards = [
+    ['Faculty', stats?.faculty], ['Student groups', stats?.student_groups], ['Courses', stats?.courses],
+    ['Rooms', stats?.rooms], ['Timetable sessions', stats?.timetable_sessions], ['Examinations', stats?.examinations],
+  ] as const
 
-      <div className={`dashboard-connection-note is-${apiState}`} role="status" aria-live="polite">
-        <span className="connection-indicator" aria-hidden="true" />
-        <span>
-          {apiState === 'checking' && 'Checking the documented API health endpoint…'}
-          {apiState === 'available' && 'API is reachable.'}
-          {apiState === 'unavailable' && 'Could not reach the API. Dataset metadata is unavailable.'}
-        </span>
-        {lastChecked && <time dateTime={lastChecked.toISOString()}>Checked {lastChecked.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })}</time>}
-      </div>
-
-      <section className="dashboard-kpis" aria-label="Campus key metrics">
-        {metrics.map((metric) => <MetricCard key={metric.label} {...metric} />)}
-      </section>
-
-      <section className="dashboard-main-grid" aria-label="Campus operations details">
-        <article className="dashboard-panel imported-datasets-panel">
-          <div className="dashboard-panel-heading">
-            <div><p className="section-eyebrow">DATA SOURCES</p><h2>Imported datasets</h2></div>
-            <span className="panel-data-status"><span />{datasetState === 'loaded' ? `${datasets.length} found` : datasetState === 'loading' ? 'Loading' : 'Unavailable'}</span>
-          </div>
-          {datasetState === 'loading' && <p className="panel-description" role="status">Loading dataset metadata…</p>}
-          {datasetState === 'error' && <p className="panel-description" role="status">Dataset metadata could not be loaded. Check the backend database connection and refresh.</p>}
-          {datasetState === 'loaded' && datasets.length === 0 && <p className="panel-description">No datasets have been imported yet.</p>}
-          {datasetState === 'loaded' && datasets.length > 0 && (
-            <div className="dashboard-table-wrap">
-              <table className="dashboard-table imported-datasets-table">
-                <thead><tr><th>Source ID</th><th>Institute</th><th>Imported</th></tr></thead>
-                <tbody>{datasets.map((dataset) => (
-                  <tr key={dataset.id}>
-                    <td>{dataset.source_dataset_id}</td>
-                    <td>{dataset.institute}</td>
-                    <td>{new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium' }).format(new Date(dataset.created_at))}</td>
-                  </tr>
-                ))}</tbody>
-              </table>
-            </div>
-          )}
-        </article>
-        <article className="dashboard-panel utilisation-panel">
-          <div className="dashboard-panel-heading">
-            <div><p className="section-eyebrow">SPACE PERFORMANCE</p><h2>Room utilisation</h2></div>
-            <span className="panel-data-status"><span />No data</span>
-          </div>
-          <p className="panel-description">Occupancy across campus rooms</p>
-          <div className="utilisation-chart-empty">
-            <div className="chart-guides" aria-hidden="true"><i /><i /><i /><i /></div>
-            <EmptyDataState title="Utilisation data unavailable" detail="A documented occupancy source is needed to show a chart." />
-          </div>
-        </article>
-
-        <article className="dashboard-panel occupancy-panel">
-          <div className="dashboard-panel-heading">
-            <div><p className="section-eyebrow">LIVE SNAPSHOT</p><h2>Occupancy</h2></div>
-            <span className="occupancy-glyph"><Building2 size={18} aria-hidden="true" /></span>
-          </div>
-          <p className="panel-description">Current room and campus occupancy</p>
-          <div className="occupancy-empty">
-            <span className="occupancy-empty-value">—</span>
-            <span>Not available</span>
-          </div>
-          <p className="occupancy-footnote">Occupancy details will appear when an agreed data contract is available.</p>
-        </article>
-
-        <article className="dashboard-panel booking-panel">
-          <div className="dashboard-panel-heading">
-            <div><p className="section-eyebrow">VENUE OPERATIONS</p><h2>Booking activity</h2></div>
-            <Link className="panel-link" to="/bookings">All bookings <ArrowUpRight size={14} aria-hidden="true" /></Link>
-          </div>
-          <div className="dashboard-table-wrap">
-            <table className="dashboard-table">
-              <thead><tr><th>Venue</th><th>Request date &amp; time</th><th>Status</th></tr></thead>
-              <tbody><tr><td colSpan={3}><EmptyDataState title="No booking requests to display" detail="Requests will appear here when the booking API contract is available." /></td></tr></tbody>
-            </table>
-          </div>
-        </article>
-
-        <article className="dashboard-panel schedule-panel">
-          <div className="dashboard-panel-heading">
-            <div><p className="section-eyebrow">UP NEXT</p><h2>Schedule overview</h2></div>
-            <Link className="panel-link" to="/timetable">Timetable <ArrowUpRight size={14} aria-hidden="true" /></Link>
-          </div>
-          <div className="dashboard-table-wrap">
-            <table className="dashboard-table schedule-table">
-              <thead><tr><th>Course</th><th>Faculty</th><th>Room</th><th>Time</th></tr></thead>
-              <tbody><tr><td colSpan={4}><EmptyDataState title="No upcoming sessions to display" detail="Schedule data will appear here when a session listing is documented." /></td></tr></tbody>
-            </table>
-          </div>
-        </article>
-
-        <section className="dashboard-panel quick-actions-panel" aria-labelledby="quick-actions-heading">
-          <div className="dashboard-panel-heading">
-            <div><p className="section-eyebrow">SHORTCUTS</p><h2 id="quick-actions-heading">Quick actions</h2></div>
-          </div>
-          <div className="quick-action-list">
-            {quickActions.map(({ label, description, to, icon: Icon }) => (
-              <Link className="quick-action-link" to={to} key={to}>
-                <span className="quick-action-icon"><Icon size={16} strokeWidth={1.8} aria-hidden="true" /></span>
-                <span className="quick-action-copy"><strong>{label}</strong><small>{description}</small></span>
-                <ArrowUpRight size={15} className="quick-action-arrow" aria-hidden="true" />
-              </Link>
-            ))}
-          </div>
-        </section>
-
-        <section className="dashboard-panel recent-activity-panel" aria-labelledby="recent-activity-heading">
-          <div className="dashboard-panel-heading">
-            <div><p className="section-eyebrow">CAMPUS FEED</p><h2 id="recent-activity-heading">Recent activity</h2></div>
-            <Clock3 size={17} className="activity-heading-icon" aria-hidden="true" />
-          </div>
-          <EmptyDataState title="No activity available" detail="Only backend-provided activity will appear here once its source is documented." />
-        </section>
-      </section>
+  return <div className="ops-page">
+    <PageHeader eyebrow="CAMPUS OPERATIONS" title="Campus overview" description="Live dataset, schedule, booking, and venue information from the selected campus dataset." action={<button type="button" className="ops-button" disabled={loading} onClick={() => void refresh()}>{loading ? <LoaderCircle size={14} className="is-spinning" /> : <RefreshCw size={14} />}Refresh</button>} />
+    <div className={`ops-message ${apiAvailable === false ? 'error' : ''}`} role="status">
+      {apiAvailable === false ? <AlertCircle size={15} /> : <Activity size={15} />}
+      {apiAvailable === null ? (selectedDatasetId && loading ? 'Loading the selected dataset…' : 'Dataset catalog and live data are loaded from the AXIOM API.') : apiAvailable ? 'API reachable. Database-backed cards are shown only when the configured schema and dataset are available.' : error || 'API unavailable. Retry to reload.'}
     </div>
-  )
+    {datasetsError && <div className="ops-message error" role="alert">{datasetsError}<button type="button" className="ops-button" onClick={() => void refreshDatasets()}>Retry dataset list</button></div>}
+    {datasetsLoading && !selectedDatasetId && <SkeletonPage label="Loading dataset catalog"><SkeletonStats count={6} /><SkeletonStats count={4} /><section className="ops-card-grid"><SkeletonCard /><SkeletonCard /></section><section className="ops-card-grid"><article className="ops-card"><SkeletonTable rows={5} columns={4} /></article><article className="ops-card"><SkeletonTable rows={5} columns={4} /></article></section></SkeletonPage>}
+    <section className="ops-toolbar">
+      <label className="ops-field">Active dataset
+        <select value={selectedDatasetId} disabled={datasetsLoading || datasets.length === 0} onChange={(event) => selectDataset(event.target.value)}>
+          {datasets.length === 0 && <option value="">No imported datasets</option>}
+          {datasets.map((dataset) => <option key={dataset.id} value={dataset.id}>{dataset.source_dataset_id} · {dataset.institute}</option>)}
+        </select>
+      </label>
+      {selectedDataset && <span className="ops-badge good">{selectedDataset.source_dataset_id}</span>}
+      <Link to="/datasets" className="ops-button"><ArrowUpRight size={14} />Manage datasets</Link>
+    </section>
+    {!selectedDatasetId && !datasetsLoading && <div className="ops-empty"><CalendarDays size={20} /><strong>Import a dataset to start</strong><span>AXIOM does not fill the dashboard with sample campus data.</span><Link className="ops-link" to="/datasets">Open dataset management</Link></div>}
+    {loading && currentSummary && <span className="skeleton-refresh" role="status"><span className="axiom-skeleton" />Refreshing this dataset…</span>}
+    {error && selectedDatasetId && <div className="ops-message error" role="alert">{error}<button className="ops-button" type="button" onClick={() => void refresh()}>Retry</button></div>}
+    {selectedDatasetId && loadedDatasetId !== selectedDatasetId && !error && <SkeletonPage label="Loading campus dashboard"><SkeletonStats count={6} /><SkeletonStats count={4} /><section className="ops-card-grid"><SkeletonCard /><SkeletonCard /></section><section className="ops-card-grid"><article className="ops-card"><SkeletonTable rows={5} columns={4} /></article><article className="ops-card"><SkeletonTable rows={5} columns={4} /></article></section><article className="ops-card"><SkeletonTable rows={3} columns={3} /></article></SkeletonPage>}
+    {currentSummary && <>
+      <section className="ops-grid" aria-label="Selected dataset counts">{cards.map(([label, value]) => <article className="ops-stat" key={label}><span>{label}</span><strong>{value ?? '—'}</strong><small>{selectedDataset?.source_dataset_id}</small></article>)}</section>
+      <section className="ops-grid">
+        <article className="ops-stat"><span>Available schedules</span><strong>{currentSummary.schedule_count}</strong><small>{currentSummary.latest_schedule ? `Latest: ${currentSummary.latest_schedule.status}` : 'Generate a schedule to begin'}</small></article>
+        <article className="ops-stat"><span>Approved bookings</span><strong>{currentSummary.booking_counts.approved}</strong><small>For the latest schedule</small></article>
+        <article className="ops-stat"><span>Rejected bookings</span><strong>{currentSummary.booking_counts.rejected}</strong><small>For the latest schedule</small></article>
+        <article className="ops-stat"><span>Pending requests</span><strong>{currentSummary.booking_counts.pending}</strong><small>For the latest schedule</small></article>
+      </section>
+      <section className="ops-card-grid">
+        <article className="ops-card"><div className="ops-card-heading"><div><h2>Room utilisation</h2><p>{currentSummary.room_utilisation_definition}</p></div><ChartNoAxesCombined size={18} /></div><strong style={{ fontSize: 28 }}>{currentSummary.room_utilisation_percent === null ? '—' : `${currentSummary.room_utilisation_percent}%`}</strong><p className="ops-inline-note">{currentSummary.latest_schedule ? 'Calculated from the latest persisted schedule and room unavailability.' : 'Unavailable until a persisted schedule exists.'}</p></article>
+        <article className="ops-card"><div className="ops-card-heading"><div><h2>Live occupancy</h2><p>Current occupancy requires a real-time room check-in source.</p></div><DoorOpen size={18} /></div><strong style={{ fontSize: 24 }}>Not available</strong><p className="ops-inline-note">AXIOM has recurring weekly assignments, not live occupancy telemetry.</p></article>
+      </section>
+      <section className="ops-card-grid">
+        <article className="ops-card"><div className="ops-card-heading"><div><h2>Weekly schedule preview</h2><p>First assignments in the recurring weekly pattern, not live “up next” telemetry.</p></div><Link className="ops-link" to="/timetable">Open timetable <ArrowUpRight size={13} /></Link></div>
+          {currentSummary.upcoming_sessions.length === 0 ? <div className="ops-empty"><CalendarDays size={18} /><strong>No scheduled sessions</strong><span>Generate a timetable for this dataset.</span></div> : <div className="ops-table-wrap"><table className="ops-table"><thead><tr><th>Course</th><th>Day / period</th><th>Faculty</th><th>Room</th></tr></thead><tbody>{currentSummary.upcoming_sessions.map((session) => <tr key={session.session_id}><td>{session.course_name}</td><td>{session.day} · P{session.start_period}–P{session.end_period}</td><td>{session.faculty_name}</td><td>{session.room_name} · {session.room_id}</td></tr>)}</tbody></table></div>}
+        </article>
+        <article className="ops-card"><div className="ops-card-heading"><div><h2>Booking activity</h2><p>Recent requests from the selected dataset.</p></div><Link className="ops-link" to="/bookings">All bookings <ArrowUpRight size={13} /></Link></div>
+          {currentBookings.length === 0 ? <div className="ops-empty"><TicketCheck size={18} /><strong>No booking requests</strong><span>Parsed or imported requests appear here after submission.</span></div> : <div className="ops-table-wrap"><table className="ops-table"><thead><tr><th>Event</th><th>Requester</th><th>Priority</th><th>Status</th></tr></thead><tbody>{currentBookings.map((booking) => <tr key={booking.request_id}><td>{booking.title}</td><td>{booking.requester}</td><td>{booking.effective_category}</td><td><span className={`ops-badge ${booking.status === 'approved' ? 'good' : booking.status === 'rejected' ? 'bad' : 'warn'}`}>{booking.status}</span></td></tr>)}</tbody></table></div>}
+        </article>
+      </section>
+      <section className="ops-card"><div className="ops-card-heading"><div><h2>Recent disruption proposals</h2><p>Repair proposals require approval before they create a new schedule.</p></div><Link className="ops-link" to="/disruptions">Manage disruptions <ArrowUpRight size={13} /></Link></div>
+        {currentSummary.recent_repair_proposals.length === 0 ? <div className="ops-empty"><Activity size={18} /><strong>No repair proposals</strong><span>New disruption proposals are listed here when submitted.</span></div> : <div className="ops-table-wrap"><table className="ops-table"><thead><tr><th>Status</th><th>Created</th><th>Explanation</th></tr></thead><tbody>{currentSummary.recent_repair_proposals.map((proposal) => <tr key={proposal.proposal_id}><td><span className="ops-badge">{proposal.status}</span></td><td>{new Date(proposal.created_at).toLocaleString()}</td><td className="wrap-cell">{proposal.explanation}</td></tr>)}</tbody></table></div>}
+      </section>
+    </>}
+  </div>
 }

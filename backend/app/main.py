@@ -1,7 +1,10 @@
 from contextlib import asynccontextmanager
+import logging
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.api.routes import router
 from app.core.config import settings
@@ -22,6 +25,17 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+
+
+@app.exception_handler(SQLAlchemyError)
+async def database_error_handler(_request, exc: SQLAlchemyError):
+    logging.getLogger("axiom.database").error("Database request failed: %s", type(exc).__name__)
+    return JSONResponse(
+        status_code=503,
+        content={"detail": "Database is unavailable or the required schema migration is pending."},
+    )
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_origins,

@@ -105,7 +105,36 @@ See [Team structure](docs/TEAM_STRUCTURE.md), [API contracts](docs/API_CONTRACTS
 python validator.py --data data/cit_public.json --schedule exports/schedule.json
 ```
 
-The booking engine and timetable solver are implemented as backend foundations. The AI assistant, disruption management, and production dashboard remain future work.
+## Campus operations workflow
+
+The application now includes dataset management, timetable generation and review, room directory and utilisation, examination allocations, booking review and deterministic booking decisions, a review-only request assistant, and disruption repair proposals. From the UI, use **Datasets** to import JSON plus optional CSV supplements, select the dataset in the top bar, generate a schedule in **Timetable**, then review bookings, examinations and rooms. Disruption proposals are solver-generated previews; approving one explicitly creates a new schedule and preserves the baseline.
+
+The assistant is a deterministic parser and proposal handoff. It does not approve bookings or disruptions. AXIOM does not yet implement authentication or authorization; run it only in a trusted environment. Dashboard and analytics values are read from the backend. Live room occupancy is intentionally shown as unavailable because no check-in telemetry source is connected.
+
+### Import through the application
+
+Open `http://localhost:5173/datasets`. Select the dataset JSON and, if applicable, its CSV supplement files. Replacing a dataset with an existing source ID requires a separate confirmation. The API accepts one JSON file and CSV files through `POST /api/v1/datasets/import/upload` and validates the import before commit.
+
+### Migration safety
+
+Current database environments may not have the Stage 11 and Stage 12 migrations. Check the configured target first with `alembic current` from `backend/`. To preview SQL without applying it, use:
+
+```powershell
+python -m alembic -c alembic.ini upgrade head --sql
+```
+
+After confirming `DATABASE_URL` points to the intended environment and reviewing the SQL, apply migrations explicitly with `python -m alembic -c alembic.ini upgrade head`. This command mutates that configured database; it is not run automatically by AXIOM. Stage 12 adds repair-proposal persistence and `schedules.created_at` for schedule history.
+
+### Backend tests and frontend build
+
+```powershell
+cd backend
+python -m pytest -q
+cd ..\frontend
+npm run build
+```
+
+See [docs/API_INTEGRATION.md](docs/API_INTEGRATION.md), [docs/TIMETABLE_SOLVER.md](docs/TIMETABLE_SOLVER.md), and [docs/STAGE_12_END_TO_END_REPORT.md](docs/STAGE_12_END_TO_END_REPORT.md) for endpoint details and verified limitations.
 
 
 

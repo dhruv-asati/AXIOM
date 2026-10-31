@@ -12,14 +12,14 @@ from app.database.session import Base
 from app.models import (
     BookingOutcome, BookingRequest, Course, Dataset, ExamRoomAllocation, Examination,
     Faculty, Room, Schedule, ScheduleOverride, ScheduleSessionAssignment,
-    StudentGroup, TimetableSession,
+    ScheduleRepairProposal, StudentGroup, TimetableSession,
 )
 
 EXPECTED_TABLES = {
     "datasets", "faculty", "courses", "student_groups", "rooms", "room_unavailability",
     "session_groups", "timetable_sessions", "booking_requests", "cancellations",
     "schedules", "schedule_session_assignments", "booking_outcomes", "examinations",
-    "exam_room_allocations", "schedule_overrides",
+    "exam_room_allocations", "schedule_overrides", "schedule_repair_proposals",
 }
 
 
@@ -147,8 +147,14 @@ class ModelMetadataTests(unittest.TestCase):
         tree = ast.parse(migration_files[0].read_text(encoding="utf-8"))
         creates = [n.args[0].value for n in ast.walk(tree) if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr == "create_table"]
         drops = [n.args[0].value for n in ast.walk(tree) if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr == "drop_table"]
-        self.assertEqual(EXPECTED_TABLES, set(creates))
-        self.assertEqual(EXPECTED_TABLES, set(drops))
+        initial_tables = EXPECTED_TABLES - {"schedule_repair_proposals"}
+        self.assertEqual(initial_tables, set(creates))
+        self.assertEqual(initial_tables, set(drops))
+        repair_files = list((Path(__file__).parents[1] / "migrations" / "versions").glob("*_disruption_repair_proposals.py"))
+        self.assertEqual(1, len(repair_files))
+        repair_tree = ast.parse(repair_files[0].read_text(encoding="utf-8"))
+        repair_creates = [n.args[0].value for n in ast.walk(repair_tree) if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr == "create_table"]
+        self.assertEqual({"schedule_repair_proposals"}, set(repair_creates))
 
 
 if __name__ == "__main__":

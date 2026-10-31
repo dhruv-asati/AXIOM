@@ -122,6 +122,40 @@ def test_basket_synchronizes_and_combined_session_reserves_all_groups(db):
     assert (by_id["COMBINED"]["day"], by_id["COMBINED"]["start_period"]) != (by_id["OE-1"]["day"], by_id["OE-1"]["start_period"])
 
 
+def test_generation_accepts_complete_same_dataset_warm_start(db):
+    dataset = add_dataset(db, days=["MON"])
+    group = add_group(db, dataset, "G1")
+    add_room(db, dataset, "R1")
+    faculty = add_faculty(db, dataset, "F1")
+    add_session(db, dataset, "S1", faculty, [group])
+    db.commit()
+    first = generate_schedule(db, dataset.id, time_limit_seconds=10)
+    db.commit()
+    second = generate_schedule(
+        db, dataset.id, time_limit_seconds=10, warm_start_schedule_id=first.schedule_id,
+    )
+    db.commit()
+    assert second.scheduled_sessions == 1
+    assert second.status in {"optimal", "feasible"}
+    assert second.solve_time_seconds > 0
+    assert second.best_objective_bound <= second.solver_objective
+
+
+def test_generation_rejects_cross_dataset_warm_start(db):
+    dataset = add_dataset(db, days=["MON"])
+    group = add_group(db, dataset, "G1")
+    add_room(db, dataset, "R1")
+    faculty = add_faculty(db, dataset, "F1")
+    add_session(db, dataset, "S1", faculty, [group])
+    db.commit()
+    first = generate_schedule(db, dataset.id, time_limit_seconds=10)
+    db.commit()
+    other = add_dataset(db, source="other-solver-test", days=["MON"])
+    db.commit()
+    with pytest.raises(LookupError, match="Warm-start schedule not found"):
+        generate_schedule(db, other.id, time_limit_seconds=10, warm_start_schedule_id=first.schedule_id)
+
+
 def test_three_hour_lab_starts_only_at_allowed_period(db):
     dataset = add_dataset(db, days=["MON"])
     group = add_group(db, dataset, "G")

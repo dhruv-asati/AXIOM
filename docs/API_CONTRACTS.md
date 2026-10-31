@@ -1,55 +1,55 @@
 # API contracts
 
-Base path: `/api/v1`. System, dataset, timetable, and deterministic booking decision endpoints are implemented; other contracts remain placeholders. See [API_INTEGRATION.md](API_INTEGRATION.md) for request/response details, errors, and local setup.
+Base path: `/api/v1`; interactive Swagger documentation is served at `/docs` and OpenAPI JSON at `/openapi.json`.
+
+All dataset and schedule paths use database UUIDs. The backend verifies dataset ownership and scopes record reads and writes to the selected dataset. Errors use FastAPI's `{"detail": ...}` envelope. Database/schema availability failures return HTTP 503. No route provides authentication or authorization in this version.
 
 ## System
 
-- `GET /health` — implemented foundation check. Returns `{"status":"ok","service":"axiom-api"}`.
+- `GET /health` — HTTP liveness only.
+- `GET /ready` — executes a database check and reports database readiness.
 
 ## Datasets
 
-- `POST /datasets/import` — body `{"path":"cit_public.json"}`; reads only from repository `data/`, validates records and atomically upserts the dataset. A directory path must contain exactly one dataset JSON. Returns database `dataset_id`, source dataset ID and counts per imported table. Malformed records return HTTP 422; paths outside `data/` return HTTP 400.
-- `GET /datasets` — list imported dataset IDs and institute names.
-- `GET /datasets/{dataset_id}` — retrieve one dataset's metadata; unknown UUIDs return HTTP 404.
+- `POST /datasets/import` — imports a JSON dataset from the configured repository data directory. `replace_existing` must be true to replace an existing source dataset ID.
+- `POST /datasets/import/upload` — multipart `files` containing exactly one JSON dataset and optional CSV supplements; `replace_existing` is a form field. Uploads are limited to CSV/JSON and bounded size/count.
+- `GET /datasets` and `GET /datasets/{dataset_id}` — catalog and metadata.
+- `GET /datasets/{dataset_id}/summary` — source counts, schedules, bookings, room utilization, weekly assignment preview and recent repair proposals.
 
-## Dataset and campus reference data
+## Timetable and exams
 
-Owner: Dhruv (API/persistence), Niharika (solver inputs).
+- `POST /datasets/{dataset_id}/schedules/generate` — CP-SAT generation and persistence. Supports optional warm-start schedule ID; returns solver status and counts.
+- `GET /datasets/{dataset_id}/schedules` — schedule list.
+- `GET /datasets/{dataset_id}/schedule-history` — ordered schedule history.
+- `GET /datasets/{dataset_id}/schedules/{schedule_id}` — schedule status and counts.
+- `GET /datasets/{dataset_id}/schedules/{schedule_id}/assignments` — assignment details; optional `day`, `faculty_id`, `room_id`, `course_id`, and `group_id` filters.
+- `GET /datasets/{dataset_id}/schedules/{schedule_id}/examinations` — exam slots and all room allocations with effective capacities.
+- `GET /datasets/{dataset_id}/schedules/{schedule_id}/export` — official validator-compatible JSON.
 
-- `GET /campus/rooms` — TODO: filters and room response schema.
-- `GET /campus/faculty` — TODO: response schema and privacy scope.
-- `GET /campus/groups` — TODO: response schema.
+Infeasibility returns 422; solver timeout without a complete solution returns 503; incomplete export returns 409. A generated schedule is persisted as a separate record.
 
-## Timetables
+## Venues and bookings
 
-Owner: Niharika.
+- `GET /datasets/{dataset_id}/rooms` — room characteristics and schedule utilization; filters include `schedule_id`, `room_type`, `min_capacity`, `accessible`, `day`, `period`, and `available_only`.
+- `GET /datasets/{dataset_id}/bookings?schedule_id=...` — requests and status for a schedule (omitting schedule ID returns requests as pending).
+- `POST /datasets/{dataset_id}/booking-requests` — add a validated request to the selected dataset; duplicate source IDs return 409.
+- `POST /datasets/{dataset_id}/schedules/{schedule_id}/bookings/run` — deterministic booking decision run.
+- `GET /datasets/{dataset_id}/schedules/{schedule_id}/booking-outcomes` — persisted outcomes and pending requests.
 
-- `POST /datasets/{dataset_id}/schedules/generate` — implemented CP-SAT generation. Body: `{"team":"AXIOM","time_limit_seconds":120}`. Returns schedule UUID/source ID, `optimal` or `feasible` status, scheduled counts and soft scores. Infeasible data returns HTTP 422 without persisting partial schedules; no solution before timeout returns HTTP 503.
-- `GET /datasets/{dataset_id}/schedules/{schedule_id}/assignments` — returns persisted session assignment rows and completeness status. Dataset mismatch returns HTTP 404.
-- `GET /datasets/{dataset_id}/schedules/{schedule_id}/export` — returns the validator-compatible schedule JSON, including all session assignments and required exam room allocations. Incomplete schedule or exam data returns HTTP 409.
-- `POST /timetables/{timetable_id}/disruptions` — TODO: disruption input and repaired schedule response.
+Booking decisions stay rule-based: the route does not call an LLM. Re-running updates outcomes rather than duplicating them.
 
-See [TIMETABLE_SOLVER.md](TIMETABLE_SOLVER.md) for the enforced rules and exact validator scoring weights.
+## Assistant and disruptions
 
-## Venue bookings
+- `POST /assistant/bookings/parse` — deterministic, review-only booking interpretation.
+- `POST /assistant/disruptions/parse` — deterministic disruption interpretation only.
+- `POST /datasets/{dataset_id}/schedules/{schedule_id}/assistant/disruptions/repair-proposals` — parses a request, then creates a CP-SAT review proposal only when the parse is complete.
+- `POST /datasets/{dataset_id}/schedules/{schedule_id}/repair-proposals` — create a proposal from structured `changes`.
+- `GET /datasets/{dataset_id}/repair-proposals` and `GET /datasets/{dataset_id}/schedules/{schedule_id}/repair-proposals/{proposal_id}` — list/read proposals.
+- `POST .../{proposal_id}/approve` — explicit approval creates a new schedule; baseline remains intact.
+- `POST .../{proposal_id}/reject` — explicit rejection (body `{"reason":"..."}`).
 
-Owner: Dhruv.
+Proposal creation is a preview and never mutates the baseline. Stale proposals are rejected at approval. These routes require migration `8c41d892c2aa`; schedule history requires `cd9a2f1b7e40`.
 
-- `POST /datasets/{dataset_id}/schedules/{schedule_id}/bookings/run` — implemented deterministic, transactional decision run for all booking requests in the dataset, evaluated against the specified same-dataset schedule. Returns approved/rejected/pending counts. Unknown datasets or schedules return HTTP 404; invalid priority metadata returns HTTP 422.
-- `GET /datasets/{dataset_id}/schedules/{schedule_id}/booking-outcomes` — implemented ordered request decisions, including `pending` when no outcome exists for that request and schedule.
-- `POST /bookings/requests` — TODO: booking request and validation errors.
-- `GET /bookings/requests` — TODO: filtering, pagination, and status fields.
-- `POST /bookings/requests/{request_id}/decision` — TODO: approval/rejection payload and priority behavior.
+## Frontend connection
 
-## AI assistant
-
-Owner: Siddharth.
-
-- `POST /assistant/requests` — TODO: natural-language input, parsed intent, clarification, and action proposal schemas.
-
-## Frontend integration
-
-Owner: Om.
-
-- Backend base URL is configured with `VITE_API_URL`.
-- TODO: agree on authentication (if required), error envelope, pagination, and generated TypeScript types.
+Set `VITE_API_URL` to the API base URL, for example `http://localhost:8000/api/v1`. The backend `CORS_ORIGINS` setting must include the frontend origin. See [API_INTEGRATION.md](API_INTEGRATION.md) for setup and workflow examples.

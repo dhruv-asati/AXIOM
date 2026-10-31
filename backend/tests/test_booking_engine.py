@@ -84,7 +84,7 @@ def add_request(db, dataset, source, *, category="department_event", role="depar
 
 def test_imports_mapper_configuration_and_relationships():
     configure_mappers()
-    assert len(Base.metadata.tables) == 16
+    assert len(Base.metadata.tables) == 17
     assert "booking_outcomes" in Base.metadata.tables
     assert BookingOutcome.request.property.mapper.class_ is BookingRequest
     assert "/api/v1/datasets/{dataset_id}/schedules/{schedule_id}/bookings/run" in app.openapi()["paths"]

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
+from time import perf_counter
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -11,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.models import (
     Course, Dataset, Examination, Faculty, Room, RoomUnavailability, Schedule,
-    ScheduleSessionAssignment, StudentGroup, TimetableSession,
+    ScheduleRepairProposal, ScheduleSessionAssignment, StudentGroup, TimetableSession,
 )
 from app.models.entities import ExamRoomAllocation, session_groups
 
@@ -38,6 +39,23 @@ class SolveResult:
     scheduled_exams: int
     schedule_id: UUID
     source_id: str
+    solver_objective: int = 0
+    best_objective_bound: float = 0
+    solve_time_seconds: float = 0
+
+
+@dataclass
+class SolverSolution:
+    status: str
+    assignments: dict[str, tuple[str, int, str]]
+    exam_assignments: dict[str, tuple[str, str, list[str]]]
+    soft_penalties: dict[str, int]
+    soft_total: int
+    exam_soft_penalty: int
+    objective: int
+    best_bound: float
+    solve_time_seconds: float
+    changed_session_ids: list[str]
 
 
 def _score_solution(
@@ -103,6 +121,19 @@ def _score_solution(
     return penalties, sum(penalties.values()), exam_penalty
 
 
+def _approved_removed_session_ids(db: Session, dataset_id: UUID) -> set[str]:
+    approved_changes = db.scalars(select(ScheduleRepairProposal.changes).where(
+        ScheduleRepairProposal.dataset_id == dataset_id,
+        ScheduleRepairProposal.status == "approved",
+    )).all()
+    return {
+        change["session_id"]
+        for changes in approved_changes
+        for change in (changes or [])
+        if change.get("type") == "remove_session"
+    }
+
+
 def _build_and_solve(
     dataset: Dataset,
     sessions: list[TimetableSession],
@@ -114,7 +145,15 @@ def _build_and_solve(
     session_group_rows: list[tuple[str, str]],
     exams: list[Examination],
     time_limit_seconds: float,
-) -> tuple[str, dict[str, tuple[str, int, str]], dict[str, tuple[str, str, list[str]]], dict[str, int], int, int]:
+    *,
+    baseline_assignments: dict[str, tuple[str, int, str]] | None = None,
+    baseline_exam_assignments: dict[str, tuple[str, str, list[str]]] | None = None,
+    removed_session_ids: set[str] | None = None,
+    repair_change_weight: int = 100,
+    repair_group_weight: int = 5,
+    hint_assignments: dict[str, tuple[str, int, str]] | None = None,
+    hint_exam_assignments: dict[str, tuple[str, str, list[str]]] | None = None,
+) -> SolverSolution:
     calendar = dataset.calendar or {}
     days = list(calendar.get("days") or [])
     teaching_periods = sorted(int(p["id"]) for p in calendar.get("periods", []) if p.get("teaching"))
@@ -142,6 +181,12 @@ def _build_and_solve(
             room_unavailable[row.room_source_id].add((row.day, int(period)))
 
     model = cp_model.CpModel()
+    repair_mode = baseline_assignments is not None
+    baseline_assignments = baseline_assignments or {}
+    baseline_exam_assignments = baseline_exam_assignments or {}
+    hint_assignments = hint_assignments if hint_assignments is not None else baseline_assignments
+    hint_exam_assignments = hint_exam_assignments if hint_exam_assignments is not None else baseline_exam_assignments
+    removed_session_ids = removed_session_ids or set()
     session_y: dict[tuple[str, str, int], cp_model.IntVar] = {}
     session_x: dict[tuple[str, str, int, str], cp_model.IntVar] = {}
     session_candidates: dict[str, list[tuple[str, int]]] = defaultdict(list)
@@ -285,8 +330,44 @@ def _build_and_solve(
             if terms:
                 model.add(sum(terms) <= faculty.max_hours_per_day)
 
-    # Exact validator soft costs. Hard constraints above remain separate.
+    # Repair stability is an additional objective layer; official scoring stays
+    # independent and is recomputed from the selected assignments below.
     objective_terms: list[Any] = []
+    changed_vars: dict[str, cp_model.IntVar] = {}
+    if repair_mode:
+        for session in sessions:
+            baseline = baseline_assignments.get(session.source_id)
+            unchanged = model.new_bool_var(f"unchanged_{session.source_id}")
+            matching = session_x.get((session.source_id, *(baseline or ("", -1, ""))))
+            if matching is None:
+                model.add(unchanged == 0)
+            else:
+                model.add(unchanged == matching)
+            changed = model.new_bool_var(f"changed_{session.source_id}")
+            model.add(changed + unchanged == 1)
+            changed_vars[session.source_id] = changed
+            objective_terms.append(repair_change_weight * changed)
+        removed_group_ids = {
+            group_id for session_id in removed_session_ids
+            for group_id in session_groups_by_id.get(session_id, set())
+        }
+        changed_group_ids = removed_group_ids | {
+            group_id for session_id in changed_vars
+            for group_id in session_groups_by_id.get(session_id, set())
+        }
+        for group_id in sorted(changed_group_ids):
+            terms = [changed_vars[sid] for sid in changed_vars if group_id in session_groups_by_id.get(sid, set())]
+            changed_group = model.new_bool_var(f"changed_group_{group_id}")
+            if group_id in removed_group_ids:
+                model.add(changed_group == 1)
+            elif terms:
+                model.add_max_equality(changed_group, terms)
+            else:
+                model.add(changed_group == 0)
+            objective_terms.append(repair_group_weight * changed_group)
+        objective_terms.append(repair_change_weight * len(removed_session_ids))
+
+    # Exact validator soft costs. Hard constraints above remain separate.
     for session in sessions:
         faculty = faculty_by_id[session.faculty_source_id]
         avoid = set()
@@ -399,6 +480,16 @@ def _build_and_solve(
         if not exam_candidates[exam.source_id]:
             no_candidate_exams.append(exam.source_id)
         model.add(sum(exam_y[(exam.source_id, day, slot)] for day, slot in exam_candidates[exam.source_id]) == 1)
+        baseline_exam = baseline_exam_assignments.get(exam.source_id)
+        if baseline_exam is not None:
+            original_day, original_slot, original_rooms = baseline_exam
+            for day, slot in exam_candidates[exam.source_id]:
+                selected = int((day, slot) == (original_day, original_slot))
+                model.add(exam_y[(exam.source_id, day, slot)] == selected)
+                for room in exam_rooms:
+                    room_var = exam_z.get((exam.source_id, day, slot, room.source_id))
+                    if room_var is not None:
+                        model.add(room_var == int(selected and room.source_id in original_rooms))
     if no_candidate_exams:
         raise InfeasibleTimetableError("No legal exam calendar slot for exam(s): " + ", ".join(sorted(set(no_candidate_exams))))
     for terms in exam_room_use.values():
@@ -422,7 +513,31 @@ def _build_and_solve(
     solver.parameters.max_time_in_seconds = max(1.0, float(time_limit_seconds))
     solver.parameters.num_search_workers = 1
     solver.parameters.random_seed = 0
+    if hint_assignments:
+        for key, variable in session_y.items():
+            session_id, day, start = key
+            baseline = hint_assignments.get(session_id)
+            if baseline is not None:
+                model.add_hint(variable, int((day, start) == baseline[:2]))
+        for key, variable in session_x.items():
+            session_id, day, start, room_id = key
+            baseline = hint_assignments.get(session_id)
+            if baseline is not None:
+                model.add_hint(variable, int(baseline == (day, start, room_id)))
+    if hint_exam_assignments:
+        for key, variable in exam_y.items():
+            exam_id, day, slot = key
+            baseline = hint_exam_assignments.get(exam_id)
+            if baseline is not None:
+                model.add_hint(variable, int((day, slot) == baseline[:2]))
+        for key, variable in exam_z.items():
+            exam_id, day, slot, room_id = key
+            baseline = hint_exam_assignments.get(exam_id)
+            if baseline is not None:
+                model.add_hint(variable, int((day, slot) == baseline[:2] and room_id in baseline[2]))
+    started = perf_counter()
     status_code = solver.solve(model)
+    solve_time_seconds = perf_counter() - started
     if status_code == cp_model.INFEASIBLE:
         raise InfeasibleTimetableError("The dataset is infeasible under its hard timetable and exam constraints")
     if status_code not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
@@ -450,7 +565,21 @@ def _build_and_solve(
         sessions, session_groups_by_id, faculty_by_id, room_by_id, assignment, exam_assignment, exams, days,
     )
     status = "optimal" if status_code == cp_model.OPTIMAL else "feasible"
-    return status, assignment, exam_assignment, penalties, total, exam_penalty
+    return SolverSolution(
+        status=status,
+        assignments=assignment,
+        exam_assignments=exam_assignment,
+        soft_penalties=penalties,
+        soft_total=total,
+        exam_soft_penalty=exam_penalty,
+        objective=int(round(solver.objective_value)),
+        best_bound=float(solver.best_objective_bound),
+        solve_time_seconds=solve_time_seconds,
+        changed_session_ids=sorted(
+            session_id for session_id in set(assignment) | set(baseline_assignments) | removed_session_ids
+            if assignment.get(session_id) != baseline_assignments.get(session_id)
+        ),
+    )
 
 
 def generate_schedule(
@@ -459,6 +588,7 @@ def generate_schedule(
     *,
     team: str = "AXIOM",
     time_limit_seconds: float = 120,
+    warm_start_schedule_id: UUID | None = None,
 ) -> SolveResult:
     """Solve and persist a full session and exam schedule for one dataset."""
     transaction = db.begin_nested() if db.in_transaction() else db.begin()
@@ -466,7 +596,11 @@ def generate_schedule(
         dataset = db.scalar(select(Dataset).where(Dataset.id == dataset_id).with_for_update())
         if dataset is None:
             raise LookupError("Dataset not found")
-        sessions = db.scalars(select(TimetableSession).where(TimetableSession.dataset_id == dataset_id).order_by(TimetableSession.source_id)).all()
+        removed_session_ids = _approved_removed_session_ids(db, dataset_id)
+        sessions = db.scalars(select(TimetableSession).where(
+            TimetableSession.dataset_id == dataset_id,
+            TimetableSession.source_id.not_in(removed_session_ids) if removed_session_ids else True,
+        ).order_by(TimetableSession.source_id)).all()
         courses = db.scalars(select(Course).where(Course.dataset_id == dataset_id).order_by(Course.source_id)).all()
         faculties = db.scalars(select(Faculty).where(Faculty.dataset_id == dataset_id).order_by(Faculty.source_id)).all()
         groups = db.scalars(select(StudentGroup).where(StudentGroup.dataset_id == dataset_id).order_by(StudentGroup.source_id)).all()
@@ -474,8 +608,42 @@ def generate_schedule(
         unavailability = db.scalars(select(RoomUnavailability).where(RoomUnavailability.dataset_id == dataset_id)).all()
         exams = db.scalars(select(Examination).where(Examination.dataset_id == dataset_id).order_by(Examination.source_id)).all()
         linked_groups = db.execute(select(session_groups.c.session_source_id, session_groups.c.group_source_id).where(session_groups.c.dataset_id == dataset_id)).all()
-        status, assignment, exam_assignment, penalties, total, exam_penalty = _build_and_solve(
+        warm_assignments = None
+        warm_exam_assignments = None
+        if warm_start_schedule_id is not None:
+            warm_schedule = db.scalar(select(Schedule).where(
+                Schedule.id == warm_start_schedule_id,
+                Schedule.dataset_id == dataset_id,
+            ))
+            if warm_schedule is None:
+                raise LookupError("Warm-start schedule not found for dataset")
+            assignment_rows = db.scalars(select(ScheduleSessionAssignment).where(
+                ScheduleSessionAssignment.dataset_id == dataset_id,
+                ScheduleSessionAssignment.schedule_id == warm_start_schedule_id,
+            )).all()
+            warm_assignments = {
+                row.session_source_id: (row.day, row.start_period, row.room_source_id)
+                for row in assignment_rows
+            }
+            expected_sessions = {session.source_id for session in sessions}
+            if set(warm_assignments) != expected_sessions:
+                raise TimetableSolveError("Warm-start schedule does not contain exactly the active dataset sessions")
+            warm_exam_rows = db.scalars(select(ExamRoomAllocation).where(
+                ExamRoomAllocation.dataset_id == dataset_id,
+                ExamRoomAllocation.schedule_id == warm_start_schedule_id,
+            ).order_by(ExamRoomAllocation.examination_source_id, ExamRoomAllocation.room_source_id)).all()
+            warm_exam_assignments = {}
+            for row in warm_exam_rows:
+                current = warm_exam_assignments.get(row.examination_source_id)
+                if current is not None and current[:2] != (row.day, row.session):
+                    raise TimetableSolveError("Warm-start schedule has inconsistent exam allocation slots")
+                warm_exam_assignments.setdefault(row.examination_source_id, (row.day, row.session, []))[2].append(row.room_source_id)
+            if set(warm_exam_assignments) != {exam.source_id for exam in exams} or any(not value[2] for value in warm_exam_assignments.values()):
+                raise TimetableSolveError("Warm-start schedule does not contain complete exam allocations")
+        solution = _build_and_solve(
             dataset, sessions, courses, faculties, groups, rooms, unavailability, linked_groups, exams, time_limit_seconds,
+            hint_assignments=warm_assignments,
+            hint_exam_assignments=warm_exam_assignments,
         )
 
         schedule_source_id = f"cp-sat-{uuid4()}"
@@ -491,7 +659,7 @@ def generate_schedule(
                 day=day,
                 start_period=start,
             )
-            for session_id, (day, start, room_id) in assignment.items()
+            for session_id, (day, start, room_id) in solution.assignments.items()
         ])
         db.add_all([
             ExamRoomAllocation(
@@ -502,43 +670,133 @@ def generate_schedule(
                 day=day,
                 session=slot,
             )
-            for exam_id, (day, slot, room_ids) in exam_assignment.items()
+            for exam_id, (day, slot, room_ids) in solution.exam_assignments.items()
             for room_id in room_ids
         ])
         db.flush()
         return SolveResult(
-            status=status,
-            soft_penalties=penalties,
-            soft_total=total,
-            exam_soft_penalty=exam_penalty,
-            scheduled_sessions=len(assignment),
-            scheduled_exams=len(exam_assignment),
+            status=solution.status,
+            soft_penalties=solution.soft_penalties,
+            soft_total=solution.soft_total,
+            exam_soft_penalty=solution.exam_soft_penalty,
+            scheduled_sessions=len(solution.assignments),
+            scheduled_exams=len(solution.exam_assignments),
             schedule_id=schedule.id,
             source_id=schedule.source_id,
+            solver_objective=solution.objective,
+            best_objective_bound=solution.best_bound,
+            solve_time_seconds=solution.solve_time_seconds,
         )
 
 
-def get_schedule_assignments(db: Session, dataset_id: UUID, schedule_id: UUID) -> dict[str, Any]:
+def get_schedule_assignments(
+    db: Session,
+    dataset_id: UUID,
+    schedule_id: UUID,
+    *,
+    day: str | None = None,
+    faculty_id: str | None = None,
+    room_id: str | None = None,
+    course_id: str | None = None,
+    group_id: str | None = None,
+) -> dict[str, Any]:
     dataset = db.get(Dataset, dataset_id)
     if dataset is None:
         raise LookupError("Dataset not found")
     schedule = db.scalar(select(Schedule).where(Schedule.id == schedule_id, Schedule.dataset_id == dataset_id))
     if schedule is None:
         raise LookupError("Schedule not found for dataset")
-    assignments = db.scalars(select(ScheduleSessionAssignment).where(
-        ScheduleSessionAssignment.dataset_id == dataset_id,
-        ScheduleSessionAssignment.schedule_id == schedule_id,
-    ).order_by(ScheduleSessionAssignment.session_source_id)).all()
+    removed_session_ids = _approved_removed_session_ids(db, dataset_id)
+    dataset_session_ids = set(db.scalars(select(TimetableSession.source_id).where(
+        TimetableSession.dataset_id == dataset_id,
+    )).all())
+    active_session_ids = dataset_session_ids - removed_session_ids
+    rows = db.execute(
+        select(
+            ScheduleSessionAssignment.session_source_id,
+            ScheduleSessionAssignment.day,
+            ScheduleSessionAssignment.start_period,
+            TimetableSession.course_source_id,
+            TimetableSession.faculty_source_id,
+            TimetableSession.kind,
+            TimetableSession.duration,
+            Course.title,
+            Course.department,
+            Course.year,
+            Faculty.name,
+            Room.source_id,
+            Room.name,
+            session_groups.c.group_source_id,
+            StudentGroup.name,
+        )
+        .select_from(ScheduleSessionAssignment)
+        .join(TimetableSession, (TimetableSession.dataset_id == ScheduleSessionAssignment.dataset_id)
+              & (TimetableSession.source_id == ScheduleSessionAssignment.session_source_id))
+        .outerjoin(Course, (Course.dataset_id == TimetableSession.dataset_id)
+                   & (Course.source_id == TimetableSession.course_source_id))
+        .outerjoin(Faculty, (Faculty.dataset_id == TimetableSession.dataset_id)
+                   & (Faculty.source_id == TimetableSession.faculty_source_id))
+        .outerjoin(Room, (Room.dataset_id == ScheduleSessionAssignment.dataset_id)
+                   & (Room.source_id == ScheduleSessionAssignment.room_source_id))
+        .outerjoin(session_groups, (session_groups.c.dataset_id == ScheduleSessionAssignment.dataset_id)
+                   & (session_groups.c.session_source_id == ScheduleSessionAssignment.session_source_id))
+        .outerjoin(StudentGroup, (StudentGroup.dataset_id == session_groups.c.dataset_id)
+                   & (StudentGroup.source_id == session_groups.c.group_source_id))
+        .where(
+            ScheduleSessionAssignment.dataset_id == dataset_id,
+            ScheduleSessionAssignment.schedule_id == schedule_id,
+        )
+        .order_by(ScheduleSessionAssignment.session_source_id, session_groups.c.group_source_id)
+    ).all()
+    by_session: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        sid = row[0]
+        item = by_session.get(sid)
+        if item is None:
+            item = {
+                "session_id": sid,
+                "course_id": row[3],
+                "course_name": row[7] or row[3],
+                "department": row[8] or "",
+                "year": row[9] or 0,
+                "kind": row[5],
+                "duration": row[6],
+                "faculty_id": row[4],
+                "faculty_name": row[10] or row[4],
+                "day": row[1],
+                "start_period": row[2],
+                "end_period": row[2] + row[6] - 1,
+                "room_id": row[11] or "",
+                "room_name": row[12] or row[11] or "",
+                "student_groups": [],
+            }
+            by_session[sid] = item
+        if row[13] is not None:
+            item["student_groups"].append({"id": row[13], "name": row[14] or row[13]})
+    scheduled_session_ids = set(by_session)
+    enriched = []
+    for item in by_session.values():
+        group_ids = {group["id"] for group in item["student_groups"]}
+        if day and item["day"] != day:
+            continue
+        if faculty_id and item["faculty_id"] != faculty_id:
+            continue
+        if room_id and item["room_id"] != room_id:
+            continue
+        if course_id and item["course_id"] != course_id:
+            continue
+        if group_id and group_id not in group_ids:
+            continue
+        item["student_groups"].sort(key=lambda group: group["id"])
+        enriched.append(item)
+    enriched.sort(key=lambda item: item["session_id"])
     return {
         "schedule_id": str(schedule.id),
         "dataset_id": str(dataset_id),
-        "status": "complete" if len(assignments) == db.scalar(select(func.count()).select_from(TimetableSession).where(TimetableSession.dataset_id == dataset_id)) else "incomplete",
-        "assignments": [{
-            "session_id": assignment.session_source_id,
-            "day": assignment.day,
-            "start_period": assignment.start_period,
-            "room_id": assignment.room_source_id,
-        } for assignment in assignments],
+        # Historical schedules retain the sessions that were active when they
+        # were created; post-disruption schedules omit approved removals.
+        "status": "complete" if scheduled_session_ids in (dataset_session_ids, active_session_ids) else "incomplete",
+        "assignments": enriched,
     }
 
 
@@ -570,6 +828,11 @@ def export_schedule(db: Session, dataset_id: UUID, schedule_id: UUID) -> dict[st
     return {
         "team": schedule.team,
         "dataset_id": dataset.source_dataset_id,
-        "sessions": data["assignments"],
+        "sessions": [{
+            "session_id": row["session_id"],
+            "day": row["day"],
+            "start_period": row["start_period"],
+            "room_id": row["room_id"],
+        } for row in data["assignments"]],
         "exams": export_exams,
     }

@@ -3,6 +3,7 @@ import { Bell, Check, ChevronRight, Menu, Search, X } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import { routeTitles } from './navigation'
 import { UserProfile } from './UserProfile'
+import { useDatasetContext } from '../../context/DatasetContext'
 
 type TopNavbarProps = {
   onMenuClick: () => void
@@ -13,6 +14,7 @@ export function TopNavbar({ onMenuClick, isMobileMenuOpen }: TopNavbarProps) {
   const { pathname } = useLocation()
   const [search, setSearch] = useState('')
   const [showNotice, setShowNotice] = useState(false)
+  const { datasets, selectedDatasetId, selectDataset, loading: datasetsLoading } = useDatasetContext()
   const title = routeTitles[pathname] ?? 'Page not found'
 
   return (
@@ -35,6 +37,10 @@ export function TopNavbar({ onMenuClick, isMobileMenuOpen }: TopNavbarProps) {
       </div>
 
       <div className="navbar-actions">
+        <label className="dataset-switcher"><span>Dataset</span><select aria-label="Active dataset" value={selectedDatasetId} disabled={datasetsLoading || datasets.length === 0} onChange={(event) => selectDataset(event.target.value)}>
+          {datasets.length === 0 && <option value="">None</option>}
+          {datasets.map((dataset) => <option key={dataset.id} value={dataset.id}>{dataset.source_dataset_id}</option>)}
+        </select></label>
         <label className="search-field">
           <Search size={17} aria-hidden="true" />
           <input
@@ -69,3 +75,5 @@ export function TopNavbar({ onMenuClick, isMobileMenuOpen }: TopNavbarProps) {
     </header>
   )
 }
+
+import './TopNavbar.css'

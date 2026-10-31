@@ -1,0 +1,31 @@
+.skeleton-page { display: grid; min-width: 0; gap: 14px; }
+.axiom-skeleton {
+  display: block;
+  max-width: 100%;
+  min-height: 8px;
+  overflow: hidden;
+  border-radius: 5px;
+  background: linear-gradient(100deg, #edf0f4 20%, #f5f6f8 38%, #e9edf2 55%);
+  background-size: 220% 100%;
+  animation: axiom-skeleton-shimmer 1.8s ease-in-out infinite;
+}
+.axiom-skeleton.is-rounded { border-radius: 999px; }
+.skeleton-text { display: grid; gap: 8px; }
+.skeleton-text-line { height: 9px; }
+.skeleton-card { display: grid; min-width: 0; min-height: 100px; align-content: space-between; gap: 12px; padding: 15px; border: 1px solid #e8ebef; border-radius: 8px; background: #fff; }
+.skeleton-stats { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); }
+.skeleton-table { max-width: 100%; overflow: auto; border: 1px solid #e8ebef; border-radius: 7px; background: #fff; }
+.skeleton-table-row { display: grid; grid-template-columns: repeat(var(--skeleton-columns, 4), minmax(55px, 1fr)); align-items: center; gap: 18px; min-height: 43px; padding: 0 12px; border-bottom: 1px solid #edf0f2; }
+.skeleton-table-row:last-child { border-bottom: 0; }
+.skeleton-chart { display: grid; height: 170px; align-content: end; gap: 12px; padding: 12px 4px 0; }
+.skeleton-chart-bars { display: flex; height: 125px; align-items: end; gap: 8px; border-bottom: 1px solid #e8ebef; }
+.skeleton-chart-bars .axiom-skeleton { flex: 1; min-height: 20px; background: linear-gradient(100deg, #e5e9f2 20%, #eef0f6 38%, #dfe4ef 55%); background-size: 220% 100%; }
+.skeleton-timetable { min-width: 620px; display: grid; border: 1px solid #e8ebef; border-radius: 7px; overflow: hidden; }
+.skeleton-timetable-scroll { max-width: 100%; overflow: auto; border-radius: 7px; }
+.skeleton-timetable-row { display: grid; grid-template-columns: 60px repeat(var(--skeleton-days), minmax(90px, 1fr)); }
+.skeleton-timetable-row > .axiom-skeleton, .skeleton-timetable-cell { min-width: 0; min-height: 45px; display: grid; align-content: center; padding: 7px; border-right: 1px solid #edf0f2; border-bottom: 1px solid #edf0f2; }
+.skeleton-timetable-row:first-child > .axiom-skeleton { min-height: 34px; background-color: #f7f8fa; }
+.skeleton-refresh { display: inline-flex; align-items: center; gap: 8px; color: #748194; font-size: 9px; }
+.skeleton-refresh .axiom-skeleton { width: 7px; height: 7px; min-height: 7px; border-radius: 50%; }
+@keyframes axiom-skeleton-shimmer { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
+@media (prefers-reduced-motion: reduce) { .axiom-skeleton { animation: none; background: #edf0f4; } }
