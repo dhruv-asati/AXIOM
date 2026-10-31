@@ -8,12 +8,10 @@ This document separates the currently documented API from missing analytics cont
 
 - API base URL is configured through `VITE_API_URL`.
 - `GET /api/v1/health` is an HTTP liveness check; it does not confirm database readiness or return analytics.
-- `GET /api/v1/datasets` is implemented and returns dataset summaries containing `id`, `source_dataset_id`, `institute`, and `created_at`. These are dataset metadata, not operational analytics.
-- `GET /api/v1/datasets/{dataset_id}` is implemented and returns dataset metadata (`id`, `source_dataset_id`, `institute`, `calendar`, `priority_order`, and `role_category_cap`). It does not return analytics aggregates.
-- `POST /api/v1/datasets/{dataset_id}/schedules/generate` returns schedule status, scheduled session/exam counts, and soft-constraint scores. This is a solver operation that generates and persists a schedule; the Analytics page does not call it to populate a report.
-- Schedule assignments, validator-format exports, and booking outcomes are available only when both dataset and schedule IDs are known. Their documented outputs are operational records, not analytics aggregate endpoints. The frontend does not calculate totals, trends, utilisation, or solver validity from them.
-- API errors use FastAPI's `{"detail": ...}` envelope. No analytics endpoint defines analytics-specific empty/filter/error behavior.
-- `API_CONTRACTS.md` and `API_INTEGRATION.md` document no analytics endpoint, aggregation schema, or report export capability.
+- The backend currently implements only `GET /api/v1/health`, as confirmed by `backend/app/main.py` and `backend/app/api/routes.py`.
+- `docs/API_CONTRACTS.md` lists potential campus, timetable, booking, and assistant routes as placeholders with unresolved schemas. It documents no analytics endpoint.
+- No analytics response, aggregate, report export, or analytics-specific error/empty behavior is implemented or documented.
+- The frontend does not calculate totals, trends, utilisation, or solver validity from operational records.
 
 ## Requirements for Dhruv — analytics API
 
