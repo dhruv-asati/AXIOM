@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  Bot,
   BookOpenCheck,
   Bot,
   CalendarDays,
@@ -28,6 +29,7 @@ export const primaryNavigation: NavigationEntry[] = [
   { label: 'Disruptions', to: '/disruptions', icon: ShieldAlert },
   { label: 'Assistant', to: '/assistant', icon: Bot },
   { label: 'Analytics', to: '/analytics', icon: BarChart3 },
+  { label: 'AI Assistant', to: '/assistant', icon: Bot },
 ]
 
 export const settingsNavigation: NavigationEntry = {
@@ -46,6 +48,7 @@ export const routeTitles: Record<string, string> = {
   '/disruptions': 'Disruptions',
   '/assistant': 'Assistant',
   '/analytics': 'Analytics',
+  '/assistant': 'AI Assistant',
   '/settings': 'Settings',
 }
 
