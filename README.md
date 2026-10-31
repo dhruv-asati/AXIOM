@@ -99,7 +99,7 @@ python ..\validator.py --data ..\data\cit_public.json --schedule ..\exports\sche
 
 ## Team workflow and exports
 
-See [Team structure](docs/TEAM_STRUCTURE.md) and [API contracts](docs/API_CONTRACTS.md). Keep generated judge-format outputs under `exports/`. Use the official validator exactly as described in the starter README:
+See [Team structure](docs/TEAM_STRUCTURE.md), [API contracts](docs/API_CONTRACTS.md), and the implemented [backend API integration guide](docs/API_INTEGRATION.md). Keep generated judge-format outputs under `exports/`. Use the official validator exactly as described in the starter README:
 
 ```powershell
 python validator.py --data data/cit_public.json --schedule exports/schedule.json
