@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { AlertTriangle, Beaker, BookOpen, GraduationCap, MapPin, X } from 'lucide-react'
 import type { TimetableSession } from '../../types/timetable'
 import { addLocalDays, formatDate, formatSessionTime } from '../../lib/timetableTime'
@@ -22,12 +22,24 @@ function Detail({ label, children }: { label: string; children?: string | null }
 }
 
 export function SessionDetailsDialog({ session, weekStart, onClose }: SessionDetailsDialogProps) {
+  const dialogRef = useRef<HTMLElement>(null)
+
   useEffect(() => {
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    dialogRef.current?.focus()
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
+      if (event.key === 'Escape') { onClose(); return }
+      if (event.key !== 'Tab' || !dialogRef.current) return
+      const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'))
+        .filter((element) => !element.hasAttribute('disabled'))
+      if (!focusable.length) { event.preventDefault(); dialogRef.current.focus(); return }
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === dialogRef.current)) { event.preventDefault(); last.focus() }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
     }
     window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
+    return () => { window.removeEventListener('keydown', handleKeyDown); previousFocus?.focus() }
   }, [onClose])
 
   const dayIndex = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'].indexOf(session.day)
@@ -36,10 +48,10 @@ export function SessionDetailsDialog({ session, weekStart, onClose }: SessionDet
 
   return (
     <div className="session-dialog-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <section className="session-details-dialog" role="dialog" aria-modal="true" aria-labelledby="session-dialog-title" tabIndex={-1}>
+      <section ref={dialogRef} className="session-details-dialog" role="dialog" aria-modal="true" aria-labelledby="session-dialog-title" tabIndex={-1}>
         <header className="session-dialog-header">
           <div className={`session-detail-kind kind-${session.kind}`}><KindIcon size={16} aria-hidden="true" /><span>{kindLabels[session.kind]}</span></div>
-          <button type="button" className="session-dialog-close" onClick={onClose} aria-label="Close session details" autoFocus>
+          <button type="button" className="session-dialog-close" onClick={onClose} aria-label="Close session details">
             <X size={18} />
           </button>
         </header>

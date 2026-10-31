@@ -64,12 +64,12 @@ In another terminal from the repository root:
 
 ```powershell
 cd frontend
-npm install
-Copy-Item ..\.env.example .env.local
+npm ci
+Copy-Item .env.example .env.local
 npm run dev
 ```
 
-Vite serves the app at `http://localhost:5173`. `VITE_API_URL` controls the backend base URL. The starter page requests the health endpoint and displays the connection state.
+Vite prints the local app URL (normally `http://localhost:5173`). `VITE_API_URL` in `frontend/.env.local` controls the backend base URL. The dashboard uses the documented health endpoint as a liveness check; operational data remains unavailable until its API contracts are implemented. See [frontend setup and module status](frontend/README.md) and the [demo readiness guide](docs/FRONTEND_DEMO_READINESS.md).
 
 ## Database migrations
 

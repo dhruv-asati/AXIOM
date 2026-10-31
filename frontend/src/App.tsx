@@ -8,15 +8,16 @@ import { BookingsPage } from './pages/BookingsPage'
 import { TimetablePage } from './pages/TimetablePage'
 import { ExaminationsPage } from './pages/ExaminationsPage'
 import { DisruptionsPage } from './pages/DisruptionsPage'
+import { AnalyticsPage } from './pages/AnalyticsPage'
+import { AssistantPage } from './pages/AssistantPage'
 
 const sections = [
-  { path: 'analytics', title: 'Analytics', description: 'Explore campus scheduling and room utilisation insights.' },
   { path: 'settings', title: 'Settings', description: 'Configure your AXIOM workspace preferences.' },
 ]
 
 function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <Routes>
         <Route element={<MainLayout />}>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
@@ -26,6 +27,8 @@ function App() {
           <Route path="/bookings" element={<BookingsPage />} />
           <Route path="/examinations" element={<ExaminationsPage />} />
           <Route path="/disruptions" element={<DisruptionsPage />} />
+          <Route path="/analytics" element={<AnalyticsPage />} />
+          <Route path="/assistant" element={<AssistantPage />} />
           {sections.map((section) => (
             <Route
               key={section.path}

@@ -1,32 +1,32 @@
-# React + TypeScript + Vite
+# AXIOM Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+React, TypeScript, and Vite frontend for the AXIOM campus operations workspace.
 
-Currently, two official plugins are available:
+## Requirements
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- Node.js 20.19+ or 22.12+
+- npm
 
-## React Compiler
+## Local setup
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+From this directory (`frontend/`):
 
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```powershell
+npm ci
+Copy-Item .env.example .env.local
+npm run dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Vite prints the local URL (normally `http://localhost:5173`). The frontend reads `VITE_API_URL` as the API base URL; `.env.example` points to `http://localhost:8000/api/v1`. Vite environment changes require restarting the dev server.
+
+## Available scripts
+
+- `npm run dev` — start the development server.
+- `npm run build` — run TypeScript project checks and create a production build in `dist/`.
+- `npm run preview` — serve the production build locally after building.
+
+There are currently no configured lint or test scripts.
+
+## Data and integrations
+
+The only implemented backend route is `GET /api/v1/health`. Operational pages show unavailable states until their backend/solver/AI contracts are implemented and documented in `../docs/API_CONTRACTS.md`. Timetable sample placements are development-only and visibly labelled; production builds do not load them. See `../docs/FRONTEND_DEMO_READINESS.md` for module status and a verified demo flow.
