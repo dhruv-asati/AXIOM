@@ -1,10 +1,16 @@
-# API contracts (initial placeholders)
+# API contracts
 
-Base path: `/api/v1`. These contracts are intentionally placeholders; owners should agree on exact fields, errors, and status codes before implementing each endpoint. JSON examples are illustrative only.
+Base path: `/api/v1`. Dataset import, system, and deterministic booking decision endpoints are implemented; other contracts remain placeholders.
 
 ## System
 
 - `GET /health` — implemented foundation check. Returns `{"status":"ok","service":"axiom-api"}`.
+
+## Datasets
+
+- `POST /datasets/import` — body `{"path":"cit_public.json"}`; reads only from repository `data/`, validates records and atomically upserts the dataset. A directory path must contain exactly one dataset JSON. Returns database `dataset_id`, source dataset ID and counts per imported table. Malformed records return HTTP 422; paths outside `data/` return HTTP 400.
+- `GET /datasets` — list imported dataset IDs and institute names.
+- `GET /datasets/{dataset_id}` — retrieve one dataset's metadata; unknown UUIDs return HTTP 404.
 
 ## Dataset and campus reference data
 
@@ -18,14 +24,19 @@ Owner: Dhruv (API/persistence), Niharika (solver inputs).
 
 Owner: Niharika.
 
-- `POST /timetables/generate` — TODO: generation request, job behavior, and result schema.
-- `GET /timetables/{timetable_id}` — TODO: retrieval and status schema.
+- `POST /datasets/{dataset_id}/schedules/generate` — implemented CP-SAT generation. Body: `{"team":"AXIOM","time_limit_seconds":120}`. Returns schedule UUID/source ID, `optimal` or `feasible` status, scheduled counts and soft scores. Infeasible data returns HTTP 422 without persisting partial schedules; no solution before timeout returns HTTP 503.
+- `GET /datasets/{dataset_id}/schedules/{schedule_id}/assignments` — returns persisted session assignment rows and completeness status. Dataset mismatch returns HTTP 404.
+- `GET /datasets/{dataset_id}/schedules/{schedule_id}/export` — returns the validator-compatible schedule JSON, including all session assignments and required exam room allocations. Incomplete schedule or exam data returns HTTP 409.
 - `POST /timetables/{timetable_id}/disruptions` — TODO: disruption input and repaired schedule response.
+
+See [TIMETABLE_SOLVER.md](TIMETABLE_SOLVER.md) for the enforced rules and exact validator scoring weights.
 
 ## Venue bookings
 
 Owner: Dhruv.
 
+- `POST /datasets/{dataset_id}/schedules/{schedule_id}/bookings/run` — implemented deterministic, transactional decision run for all booking requests in the dataset, evaluated against the specified same-dataset schedule. Returns approved/rejected/pending counts. Unknown datasets or schedules return HTTP 404; invalid priority metadata returns HTTP 422.
+- `GET /datasets/{dataset_id}/schedules/{schedule_id}/booking-outcomes` — implemented ordered request decisions, including `pending` when no outcome exists for that request and schedule.
 - `POST /bookings/requests` — TODO: booking request and validation errors.
 - `GET /bookings/requests` — TODO: filtering, pagination, and status fields.
 - `POST /bookings/requests/{request_id}/decision` — TODO: approval/rejection payload and priority behavior.

@@ -11,13 +11,13 @@ The starter pack guide is preserved at [docs/STARTER_PACK_README.md](docs/STARTE
 - `data/` — official CIT dataset and CSV copies from the starter pack.
 - `examples/` — official schedule, disruption, and sample request examples.
 - `validator.py` — unmodified official validator.
-- `docs/` — team ownership and API contract placeholders.
+- `docs/` — team ownership, API contracts, and database schema notes.
 
 ## Requirements
 
 - Python 3.10 or newer (3.8+ is sufficient for the official validator).
 - Node.js 20.19+ or 22.12+ and npm.
-- PostgreSQL 14+ for future database-backed features. The API health check can run without a live database connection.
+- PostgreSQL 14+; configure `DATABASE_URL` for the API and dataset importer.
 
 ## Backend setup
 
@@ -32,7 +32,31 @@ Copy-Item ..\.env.example .env
 uvicorn app.main:app --reload
 ```
 
-On macOS/Linux, activate with `source .venv/bin/activate`. Configure `DATABASE_URL` in `backend/.env` for your local PostgreSQL instance. The connection is initialized but no domain tables are defined yet. API docs are at `http://localhost:8000/docs`; health check: `http://localhost:8000/api/v1/health`.
+On macOS/Linux, activate with `source .venv/bin/activate`. Configure `DATABASE_URL` in `backend/.env`. API docs are at `http://localhost:8000/docs`; health check: `http://localhost:8000/api/v1/health`.
+
+### Import a dataset
+
+The dataset import runs in one database transaction and can be repeated safely. The default source is `data/cit_public.json`; use the API request body to select another JSON file or a directory containing exactly one dataset JSON. File paths must stay under the repository `data/` directory.
+
+```powershell
+Invoke-RestMethod -Method Post -Uri http://localhost:8000/api/v1/datasets/import `
+  -ContentType 'application/json' -Body '{"path":"cit_public.json"}'
+Invoke-RestMethod http://localhost:8000/api/v1/datasets
+Invoke-RestMethod http://localhost:8000/api/v1/datasets/<dataset-uuid>
+```
+
+`GET /api/v1/datasets` lists imported datasets; `GET /api/v1/datasets/{dataset_id}` returns dataset metadata. The import response includes per-table input counts. CSV collections can supplement dataset JSON when a collection is absent.
+
+### Run the deterministic booking engine
+
+Booking decisions are evaluated against a `Schedule` belonging to the same dataset. The schedule supplies regular timetable room and student-group occupancy; the engine does not create or solve a timetable. After a schedule exists, run decisions with:
+
+```powershell
+Invoke-RestMethod -Method Post -Uri http://localhost:8000/api/v1/datasets/<dataset-uuid>/schedules/<schedule-uuid>/bookings/run
+Invoke-RestMethod http://localhost:8000/api/v1/datasets/<dataset-uuid>/schedules/<schedule-uuid>/booking-outcomes
+```
+
+The run endpoint applies dataset priority order and role caps, checks cancellations, room constraints, unavailability, timetable/group conflicts and earlier approvals, then transactionally upserts one outcome per request. The outcomes endpoint includes requests without a decision as `pending`. See [docs/BOOKING_ENGINE.md](docs/BOOKING_ENGINE.md) for the rules.
 
 ## Frontend setup
 
@@ -49,12 +73,29 @@ Vite serves the app at `http://localhost:5173`. `VITE_API_URL` controls the back
 
 ## Database migrations
 
-Alembic is configured in `backend/alembic.ini`. Once models and an initial migration are added, run from `backend/`:
+Alembic is configured in `backend/alembic.ini`. Review migrations before applying; run from `backend/`:
 
 ```powershell
 alembic revision --autogenerate -m "describe schema"
 alembic upgrade head
 ```
+
+## Generate and validate a timetable
+
+The timetable solver uses OR-Tools CP-SAT and reads all inputs from the selected imported dataset. It writes a complete schedule and exam room allocations to PostgreSQL. The generated JSON export includes weekly sessions and exams in the official validator format:
+
+```powershell
+$datasetId = '<dataset-uuid>'
+$result = Invoke-RestMethod -Method Post -Uri "http://localhost:8000/api/v1/datasets/$datasetId/schedules/generate" `
+  -ContentType 'application/json' -Body '{"team":"AXIOM","time_limit_seconds":120}'
+$scheduleId = $result.schedule_id
+Invoke-RestMethod "http://localhost:8000/api/v1/datasets/$datasetId/schedules/$scheduleId/assignments"
+Invoke-RestMethod "http://localhost:8000/api/v1/datasets/$datasetId/schedules/$scheduleId/export" |
+  ConvertTo-Json -Depth 30 | Set-Content ..\exports\schedule.json
+python ..\validator.py --data ..\data\cit_public.json --schedule ..\exports\schedule.json
+```
+
+`status` is `optimal` only when CP-SAT proves the best soft score, and `feasible` when it finds a complete hard-valid timetable but has not proved optimality within the time limit. Infeasible inputs return HTTP 422 without persisting a partial schedule. See [docs/TIMETABLE_SOLVER.md](docs/TIMETABLE_SOLVER.md) for constraints and scoring weights.
 
 ## Team workflow and exports
 
@@ -64,7 +105,7 @@ See [Team structure](docs/TEAM_STRUCTURE.md) and [API contracts](docs/API_CONTRA
 python validator.py --data data/cit_public.json --schedule exports/schedule.json
 ```
 
-The booking engine, timetable optimizer, AI assistant, domain schema, and production dashboard are intentionally not implemented in this foundation.
+The booking engine and timetable solver are implemented as backend foundations. The AI assistant, disruption management, and production dashboard remain future work.
 
 
 
