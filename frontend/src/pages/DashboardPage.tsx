@@ -157,7 +157,7 @@ export function DashboardPage() {
           {datasetState === 'loaded' && datasets.length === 0 && <p className="panel-description">No datasets have been imported yet.</p>}
           {datasetState === 'loaded' && datasets.length > 0 && (
             <div className="dashboard-table-wrap">
-              <table className="dashboard-table">
+              <table className="dashboard-table imported-datasets-table">
                 <thead><tr><th>Source ID</th><th>Institute</th><th>Imported</th></tr></thead>
                 <tbody>{datasets.map((dataset) => (
                   <tr key={dataset.id}>

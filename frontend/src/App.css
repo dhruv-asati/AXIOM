@@ -269,15 +269,18 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 .dashboard-metric-note { overflow: hidden; margin: 5px 0 0; color: #99a3af; font-size: 8.5px; text-overflow: ellipsis; white-space: nowrap; }
 .dashboard-main-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); align-items: stretch; gap: 13px; }
 .dashboard-panel { min-width: 0; padding: 17px; border: 1px solid #e5e9ed; border-radius: 9px; background: #fff; box-shadow: 0 2px 6px rgba(24,38,56,.022); }
-.utilisation-panel { grid-column: span 8; }
-.occupancy-panel { grid-column: span 4; }
+.imported-datasets-panel { grid-column: span 6; }
+.utilisation-panel { grid-column: span 6; }
+.occupancy-panel { grid-column: span 5; }
 .booking-panel { grid-column: span 7; }
-.schedule-panel { grid-column: span 5; }
-.quick-actions-panel { grid-column: span 4; }
-.recent-activity-panel { grid-column: span 8; }
+.schedule-panel { grid-column: span 7; }
+.quick-actions-panel { grid-column: span 5; }
+.recent-activity-panel { grid-column: 1 / -1; }
 .dashboard-panel-heading { display: flex; min-height: 30px; align-items: center; justify-content: space-between; gap: 12px; }
+.dashboard-panel-heading > div { min-width: 0; }
 .dashboard-panel-heading .section-eyebrow { margin: 0 0 5px; font-size: 8px; }
 .dashboard-panel-heading h2 { margin: 0; color: #29394d; font-size: 13px; font-weight: 620; letter-spacing: -.02em; }
+.imported-datasets-panel .dashboard-panel-heading h2 { white-space: nowrap; }
 .panel-description { margin: 7px 0 0; color: #929daa; font-size: 9px; }
 .panel-data-status { display: inline-flex; align-items: center; gap: 5px; padding: 4px 6px; border: 1px solid #ebedf0; border-radius: 5px; color: #98a2ad; font-size: 8px; white-space: nowrap; }
 .panel-data-status > span { width: 5px; height: 5px; border-radius: 50%; background: #aeb7c1; }
@@ -294,6 +297,10 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 .occupancy-footnote { margin: 10px 2px 0; color: #9aa4af; font-size: 8.5px; line-height: 1.5; }
 .dashboard-table-wrap { width: 100%; overflow-x: auto; margin-top: 13px; border: 1px solid #edf0f3; border-radius: 7px; }
 .dashboard-table { width: 100%; min-width: 450px; border-collapse: collapse; text-align: left; }
+.imported-datasets-table { min-width: 450px; }
+.imported-datasets-table th, .imported-datasets-table td { padding-right: 12px; padding-left: 12px; }
+.imported-datasets-table td { height: 38px; border-bottom: 1px solid #f0f2f4; color: #536276; font-size: 9px; }
+.imported-datasets-table td:first-child { color: #46566b; font-weight: 590; white-space: nowrap; }
 .dashboard-table th { height: 34px; padding: 0 12px; border-bottom: 1px solid #edf0f3; color: #8b97a5; background: #fafbfc; font-size: 8px; font-weight: 600; white-space: nowrap; }
 .dashboard-table td { padding: 0; }
 .dashboard-table td[colspan] .dashboard-empty-state { min-height: 112px; }
@@ -315,17 +322,16 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 
 @media (max-width: 1040px) {
   .dashboard-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .utilisation-panel, .occupancy-panel { grid-column: span 6; }
-  .booking-panel, .schedule-panel { grid-column: span 6; }
-  .quick-actions-panel { grid-column: span 5; }
-  .recent-activity-panel { grid-column: span 7; }
+  .dashboard-main-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dashboard-main-grid > .dashboard-panel { grid-column: auto; }
+  .dashboard-main-grid > .recent-activity-panel { grid-column: 1 / -1; }
 }
 
 @media (max-width: 760px) {
   .dashboard-page-header { align-items: flex-start; flex-direction: column; gap: 14px; }
   .dashboard-header-tools { width: 100%; justify-content: space-between; }
   .dashboard-main-grid { grid-template-columns: minmax(0, 1fr); }
-  .utilisation-panel, .occupancy-panel, .booking-panel, .schedule-panel, .quick-actions-panel, .recent-activity-panel { grid-column: 1; }
+  .dashboard-main-grid > .dashboard-panel, .dashboard-main-grid > .recent-activity-panel { grid-column: 1; }
   .dashboard-panel { padding: 15px; }
   .utilisation-chart-empty { min-height: 160px; }
   .occupancy-empty { min-height: 82px; }
