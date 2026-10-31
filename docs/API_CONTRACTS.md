@@ -1,6 +1,6 @@
 # API contracts
 
-Base path: `/api/v1`. Dataset import, system, and deterministic booking decision endpoints are implemented; other contracts remain placeholders.
+Base path: `/api/v1`. System, dataset, timetable, and deterministic booking decision endpoints are implemented; other contracts remain placeholders. See [API_INTEGRATION.md](API_INTEGRATION.md) for request/response details, errors, and local setup.
 
 ## System
 

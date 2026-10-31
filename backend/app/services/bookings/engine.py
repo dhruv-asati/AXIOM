@@ -54,6 +54,12 @@ def run_booking_engine(db: Session, dataset_id: UUID, schedule_id: UUID) -> dict
         priority_order = list(dataset.priority_order or [])
         if not priority_order or len(priority_order) != len(set(priority_order)):
             raise ValueError("Dataset priority_order must contain unique categories")
+        calendar = dataset.calendar or {}
+        calendar_days = set(calendar.get("days") or [])
+        calendar_periods = {int(period["id"]) for period in calendar.get("periods", [])}
+        if not calendar_days or not calendar_periods:
+            raise ValueError("Dataset calendar must define days and periods before booking decisions can run")
+        first_period, last_period = min(calendar_periods), max(calendar_periods)
         requests.sort(key=lambda r: (
             priority_order.index(_effective_category(dataset, r)),
             _utc(r.submitted_at),
@@ -100,14 +106,25 @@ def run_booking_engine(db: Session, dataset_id: UUID, schedule_id: UUID) -> dict
                 blockers: set[str] = set()
                 # Keep the caller's window preference order; ties remain deterministic.
                 for window in windows:
-                    start_min = int(window["from_period"])
-                    start_max = int(window["to_period"]) - request.duration_periods + 1
+                    day = window["day"]
+                    if day not in calendar_days:
+                        blockers.add("requested day is outside the dataset calendar")
+                        continue
+                    window_start = int(window["from_period"])
+                    window_end = int(window["to_period"])
+                    start_min = max(window_start, first_period)
+                    start_max = min(window_end - request.duration_periods + 1, last_period - request.duration_periods + 1)
                     if start_min > start_max:
+                        if window_start < first_period or window_end > last_period or window_start > last_period:
+                            blockers.add("requested time is outside the dataset calendar")
                         continue
                     # A single exact-length window fixes the start period.
-                    starts = [start_min] if window["to_period"] - start_min + 1 == request.duration_periods else range(start_min, start_max + 1)
+                    starts = [start_min] if window_end - window_start + 1 == request.duration_periods else range(start_min, start_max + 1)
                     for start in starts:
                         end = start + request.duration_periods - 1
+                        if any(period not in calendar_periods for period in _periods(start, end)):
+                            blockers.add("requested time crosses a non-existent dataset calendar period")
+                            continue
                         for room in candidate_rooms:
                             if "event" not in (room.allowed_uses or []):
                                 blockers.add("room is not allowed for events"); continue
@@ -121,14 +138,14 @@ def run_booking_engine(db: Session, dataset_id: UUID, schedule_id: UUID) -> dict
                                 blockers.add("missing room needs: " + ", ".join(sorted(missing))); continue
                             conflict = False
                             for period in _periods(start, end):
-                                if period in unavailable.get((room.source_id, window["day"]), set()):
+                                if period in unavailable.get((room.source_id, day), set()):
                                     blockers.add("room unavailable"); conflict = True; break
-                                if (room.source_id, window["day"], period) in room_busy:
+                                if (room.source_id, day, period) in room_busy:
                                     blockers.add("room conflicts with a class or approved booking"); conflict = True; break
-                                if any((group, window["day"], period) in group_busy for group in (request.mandatory_for_groups or [])):
+                                if any((group, day, period) in group_busy for group in (request.mandatory_for_groups or [])):
                                     blockers.add("mandatory group has a conflicting class or booking"); conflict = True; break
                             if not conflict:
-                                chosen = (room, window["day"], start, end)
+                                chosen = (room, day, start, end)
                                 break
                         if chosen:
                             break

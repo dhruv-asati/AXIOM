@@ -1,4 +1,5 @@
 from pathlib import Path
+from collections.abc import Generator
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -18,17 +19,26 @@ from app.services.timetable.solver import (
     generate_schedule,
     get_schedule_assignments,
 )
+from app.schemas.api import (
+    BookingOutcomeResponse,
+    BookingRunResponse,
+    DatasetDetailResponse,
+    DatasetImportResponse,
+    DatasetSummaryResponse,
+    ErrorResponse,
+    HealthResponse,
+    ScheduleAssignmentsResponse,
+    ScheduleExportResponse,
+    TimetableGenerateResponse,
+)
 
 router = APIRouter()
 DATA_ROOT = (Path(__file__).resolve().parents[3] / "data").resolve()
 
 
-def get_db():
-    db = SessionLocal()
-    try:
+def get_db() -> Generator[Session, None, None]:
+    with SessionLocal() as db:
         yield db
-    finally:
-        db.close()
 
 
 class DatasetImportRequest(BaseModel):
@@ -40,12 +50,17 @@ class TimetableGenerateRequest(BaseModel):
     time_limit_seconds: float = Field(default=120, ge=1, le=600)
 
 
-@router.get("/health", tags=["system"])
+@router.get("/health", tags=["system"], response_model=HealthResponse)
 def health_check() -> dict[str, str]:
     return {"status": "ok", "service": "axiom-api"}
 
 
-@router.post("/datasets/import", tags=["datasets"])
+@router.post(
+    "/datasets/import",
+    tags=["datasets"],
+    response_model=DatasetImportResponse,
+    responses={400: {"model": ErrorResponse}, 404: {"model": ErrorResponse}, 422: {"model": ErrorResponse}},
+)
 def import_dataset_endpoint(body: DatasetImportRequest, db: Session = Depends(get_db)):
     requested = (DATA_ROOT / body.path).resolve()
     if requested != DATA_ROOT and DATA_ROOT not in requested.parents:
@@ -58,13 +73,13 @@ def import_dataset_endpoint(body: DatasetImportRequest, db: Session = Depends(ge
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
-@router.get("/datasets", tags=["datasets"])
+@router.get("/datasets", tags=["datasets"], response_model=list[DatasetSummaryResponse])
 def list_datasets(db: Session = Depends(get_db)):
     rows = db.scalars(select(Dataset).order_by(Dataset.source_dataset_id)).all()
     return [{"id": str(row.id), "source_dataset_id": row.source_dataset_id, "institute": row.institute, "created_at": row.created_at} for row in rows]
 
 
-@router.get("/datasets/{dataset_id}", tags=["datasets"])
+@router.get("/datasets/{dataset_id}", tags=["datasets"], response_model=DatasetDetailResponse, responses={404: {"model": ErrorResponse}})
 def get_dataset(dataset_id: UUID, db: Session = Depends(get_db)):
     row = db.get(Dataset, dataset_id)
     if row is None:
@@ -72,7 +87,12 @@ def get_dataset(dataset_id: UUID, db: Session = Depends(get_db)):
     return {"id": str(row.id), "source_dataset_id": row.source_dataset_id, "institute": row.institute, "calendar": row.calendar, "priority_order": row.priority_order, "role_category_cap": row.role_category_cap}
 
 
-@router.post("/datasets/{dataset_id}/schedules/{schedule_id}/bookings/run", tags=["bookings"])
+@router.post(
+    "/datasets/{dataset_id}/schedules/{schedule_id}/bookings/run",
+    tags=["bookings"],
+    response_model=BookingRunResponse,
+    responses={404: {"model": ErrorResponse}, 422: {"model": ErrorResponse}},
+)
 def run_bookings_endpoint(dataset_id: UUID, schedule_id: UUID, db: Session = Depends(get_db)):
     """Run deterministic booking decisions against a schedule in this dataset."""
     try:
@@ -83,7 +103,12 @@ def run_bookings_endpoint(dataset_id: UUID, schedule_id: UUID, db: Session = Dep
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
-@router.get("/datasets/{dataset_id}/schedules/{schedule_id}/booking-outcomes", tags=["bookings"])
+@router.get(
+    "/datasets/{dataset_id}/schedules/{schedule_id}/booking-outcomes",
+    tags=["bookings"],
+    response_model=list[BookingOutcomeResponse],
+    responses={404: {"model": ErrorResponse}},
+)
 def get_booking_outcomes_endpoint(dataset_id: UUID, schedule_id: UUID, db: Session = Depends(get_db)):
     """Return a decision for each request; requests without outcomes are pending."""
     dataset = db.get(Dataset, dataset_id)
@@ -110,7 +135,12 @@ def get_booking_outcomes_endpoint(dataset_id: UUID, schedule_id: UUID, db: Sessi
     } for request in requests]
 
 
-@router.post("/datasets/{dataset_id}/schedules/generate", tags=["timetables"])
+@router.post(
+    "/datasets/{dataset_id}/schedules/generate",
+    tags=["timetables"],
+    response_model=TimetableGenerateResponse,
+    responses={404: {"model": ErrorResponse}, 422: {"model": ErrorResponse}, 503: {"model": ErrorResponse}},
+)
 def generate_timetable_endpoint(dataset_id: UUID, body: TimetableGenerateRequest, db: Session = Depends(get_db)):
     """Generate and persist a complete weekly timetable and exam plan."""
     try:
@@ -142,7 +172,12 @@ def generate_timetable_endpoint(dataset_id: UUID, body: TimetableGenerateRequest
     }
 
 
-@router.get("/datasets/{dataset_id}/schedules/{schedule_id}/assignments", tags=["timetables"])
+@router.get(
+    "/datasets/{dataset_id}/schedules/{schedule_id}/assignments",
+    tags=["timetables"],
+    response_model=ScheduleAssignmentsResponse,
+    responses={404: {"model": ErrorResponse}},
+)
 def get_timetable_assignments_endpoint(dataset_id: UUID, schedule_id: UUID, db: Session = Depends(get_db)):
     try:
         return get_schedule_assignments(db, dataset_id, schedule_id)
@@ -150,7 +185,12 @@ def get_timetable_assignments_endpoint(dataset_id: UUID, schedule_id: UUID, db: 
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-@router.get("/datasets/{dataset_id}/schedules/{schedule_id}/export", tags=["timetables"])
+@router.get(
+    "/datasets/{dataset_id}/schedules/{schedule_id}/export",
+    tags=["timetables"],
+    response_model=ScheduleExportResponse,
+    responses={404: {"model": ErrorResponse}, 409: {"model": ErrorResponse}},
+)
 def export_timetable_endpoint(dataset_id: UUID, schedule_id: UUID, db: Session = Depends(get_db)):
     """Return the schedule.json structure accepted by the official validator."""
     try:

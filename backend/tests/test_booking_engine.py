@@ -36,7 +36,7 @@ def add_dataset(db, source="test"):
     dataset = Dataset(
         source_dataset_id=source,
         institute="Test Institute",
-        calendar={"days": ["MON", "TUE"]},
+        calendar={"days": ["MON", "TUE"], "periods": [{"id": period, "teaching": period <= 9} for period in range(1, 14)]},
         priority_order=["exam", "regular_session", "institute_event", "guest_lecture", "department_event", "club_event"],
         role_category_cap={"admin": "institute_event", "faculty": "guest_lecture", "department_coordinator": "department_event", "club": "club_event"},
     )
@@ -158,6 +158,17 @@ def test_room_filters_unavailability_and_fixed_slot(db):
     assert (outcome.room_source_id, outcome.day, outcome.start_period, outcome.end_period) == ("R2", "MON", 4, 4)
 
 
+def test_booking_window_beyond_dataset_calendar_is_rejected(db):
+    dataset, schedule = add_dataset(db)
+    add_room(db, dataset)
+    add_request(db, dataset, "outside-calendar", duration_periods=2, window=[{"day": "MON", "from_period": 13, "to_period": 14}])
+    db.commit()
+    run_booking_engine(db, dataset.id, schedule.id)
+    outcome = db.scalar(select(BookingOutcome).where(BookingOutcome.request_source_id == "outside-calendar"))
+    assert outcome.status == "rejected"
+    assert "outside the dataset calendar" in outcome.reason
+
+
 @pytest.mark.parametrize(
     ("room_changes", "request_changes", "reason_fragment"),
     [
@@ -209,7 +220,13 @@ def test_dataset_isolation_and_idempotency(db):
     add_request(db, second, "same-id")
     db.commit()
     run_booking_engine(db, first.id, schedule1.id)
+    before = db.scalar(select(BookingOutcome).where(BookingOutcome.dataset_id == first.id, BookingOutcome.schedule_id == schedule1.id))
+    before_id, before_status, before_reason = before.id, before.status, before.reason
     run_booking_engine(db, first.id, schedule1.id)
+    after = db.scalar(select(BookingOutcome).where(BookingOutcome.dataset_id == first.id, BookingOutcome.schedule_id == schedule1.id))
+    assert after.id == before_id
+    assert (after.status, after.reason) == (before_status, before_reason)
+    assert db.scalar(select(func.count()).select_from(BookingOutcome).where(BookingOutcome.dataset_id == first.id, BookingOutcome.schedule_id == schedule1.id)) == 1
     run_booking_engine(db, second.id, schedule2.id)
     assert db.scalar(select(func.count()).select_from(BookingOutcome)) == 2
     assert db.scalar(select(BookingOutcome.room_source_id).where(BookingOutcome.dataset_id == second.id)) == "R2"
