@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { checkApiHealth } from '../api/health'
+import { listDatasets, type DatasetSummary } from '../api/datasets'
 
 const metrics = [
   { label: 'Total rooms', icon: Building2, note: 'Room data contract pending' },
@@ -33,6 +34,7 @@ const quickActions = [
 ]
 
 type ApiState = 'checking' | 'available' | 'unavailable'
+type DatasetState = 'loading' | 'loaded' | 'error'
 
 function MetricCard({ label, note, icon: Icon }: (typeof metrics)[number]) {
   return (
@@ -60,10 +62,13 @@ function EmptyDataState({ title, detail }: { title: string; detail: string }) {
 
 export function DashboardPage() {
   const [apiState, setApiState] = useState<ApiState>('checking')
+  const [datasetState, setDatasetState] = useState<DatasetState>('loading')
+  const [datasets, setDatasets] = useState<DatasetSummary[]>([])
   const [lastChecked, setLastChecked] = useState<Date | null>(null)
 
   const refreshConnection = useCallback(async (signal?: AbortSignal) => {
     setApiState('checking')
+    setDatasetState('loading')
     try {
       await checkApiHealth(signal)
       if (signal?.aborted) return
@@ -71,6 +76,20 @@ export function DashboardPage() {
     } catch {
       if (signal?.aborted) return
       setApiState('unavailable')
+      setDatasetState('error')
+      setDatasets([])
+      setLastChecked(new Date())
+      return
+    }
+    try {
+      const result = await listDatasets(signal)
+      if (signal?.aborted) return
+      setDatasets(result)
+      setDatasetState('loaded')
+    } catch {
+      if (signal?.aborted) return
+      setDatasets([])
+      setDatasetState('error')
     } finally {
       if (!signal?.aborted) setLastChecked(new Date())
     }
@@ -117,8 +136,8 @@ export function DashboardPage() {
         <span className="connection-indicator" aria-hidden="true" />
         <span>
           {apiState === 'checking' && 'Checking the documented API health endpoint…'}
-          {apiState === 'available' && 'API is reachable. Dashboard data contracts are not yet defined.'}
-          {apiState === 'unavailable' && 'Could not reach the API health endpoint. Dashboard data contracts are also pending.'}
+          {apiState === 'available' && 'API is reachable.'}
+          {apiState === 'unavailable' && 'Could not reach the API. Dataset metadata is unavailable.'}
         </span>
         {lastChecked && <time dateTime={lastChecked.toISOString()}>Checked {lastChecked.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })}</time>}
       </div>
@@ -128,6 +147,29 @@ export function DashboardPage() {
       </section>
 
       <section className="dashboard-main-grid" aria-label="Campus operations details">
+        <article className="dashboard-panel imported-datasets-panel">
+          <div className="dashboard-panel-heading">
+            <div><p className="section-eyebrow">DATA SOURCES</p><h2>Imported datasets</h2></div>
+            <span className="panel-data-status"><span />{datasetState === 'loaded' ? `${datasets.length} found` : datasetState === 'loading' ? 'Loading' : 'Unavailable'}</span>
+          </div>
+          {datasetState === 'loading' && <p className="panel-description" role="status">Loading dataset metadata…</p>}
+          {datasetState === 'error' && <p className="panel-description" role="status">Dataset metadata could not be loaded. Check the backend database connection and refresh.</p>}
+          {datasetState === 'loaded' && datasets.length === 0 && <p className="panel-description">No datasets have been imported yet.</p>}
+          {datasetState === 'loaded' && datasets.length > 0 && (
+            <div className="dashboard-table-wrap">
+              <table className="dashboard-table">
+                <thead><tr><th>Source ID</th><th>Institute</th><th>Imported</th></tr></thead>
+                <tbody>{datasets.map((dataset) => (
+                  <tr key={dataset.id}>
+                    <td>{dataset.source_dataset_id}</td>
+                    <td>{dataset.institute}</td>
+                    <td>{new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium' }).format(new Date(dataset.created_at))}</td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            </div>
+          )}
+        </article>
         <article className="dashboard-panel utilisation-panel">
           <div className="dashboard-panel-heading">
             <div><p className="section-eyebrow">SPACE PERFORMANCE</p><h2>Room utilisation</h2></div>
