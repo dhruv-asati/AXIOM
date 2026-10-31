@@ -1,7 +1,6 @@
 import { lazy, Suspense } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { MainLayout } from './components/layout/MainLayout'
-<<<<<<< HEAD
 import { DatasetProvider } from './context/DatasetContext'
 import { SkeletonCard, SkeletonPage, SkeletonStats } from './components/ui/Skeleton'
 
@@ -24,22 +23,6 @@ function PageFallback() {
     <SkeletonCard />
   </SkeletonPage>
 }
-=======
-import { DashboardPage } from './pages/DashboardPage'
-import { NotFoundPage } from './pages/NotFoundPage'
-import { PlaceholderPage } from './pages/PlaceholderPage'
-import { RoomsPage } from './pages/RoomsPage'
-import { BookingsPage } from './pages/BookingsPage'
-import { TimetablePage } from './pages/TimetablePage'
-import { ExaminationsPage } from './pages/ExaminationsPage'
-import { DisruptionsPage } from './pages/DisruptionsPage'
-import { AnalyticsPage } from './pages/AnalyticsPage'
-import { AssistantPage } from './pages/AssistantPage'
-
-const sections = [
-  { path: 'settings', title: 'Settings', description: 'Configure your AXIOM workspace preferences.' },
-]
->>>>>>> 64ab278f5c5d108b4b2cf627cd460dc6ba75ba08
 
 function App() {
   return (
@@ -47,7 +30,6 @@ function App() {
       <Routes>
         <Route element={<DatasetProvider><MainLayout /></DatasetProvider>}>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
-<<<<<<< HEAD
           <Route path="/dashboard" element={<Suspense fallback={<PageFallback />}><DashboardPage /></Suspense>} />
           <Route path="/datasets" element={<Suspense fallback={<PageFallback />}><DatasetsPage /></Suspense>} />
           <Route path="/timetable" element={<Suspense fallback={<PageFallback />}><TimetablePage /></Suspense>} />
@@ -59,24 +41,6 @@ function App() {
           <Route path="/analytics" element={<Suspense fallback={<PageFallback />}><AnalyticsPage /></Suspense>} />
           <Route path="/settings" element={<Suspense fallback={<PageFallback />}><SettingsPage /></Suspense>} />
           <Route path="*" element={<Suspense fallback={<PageFallback />}><NotFoundPage /></Suspense>} />
-=======
-          <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/timetable" element={<TimetablePage />} />
-          <Route path="/rooms" element={<RoomsPage />} />
-          <Route path="/bookings" element={<BookingsPage />} />
-          <Route path="/examinations" element={<ExaminationsPage />} />
-          <Route path="/disruptions" element={<DisruptionsPage />} />
-          <Route path="/analytics" element={<AnalyticsPage />} />
-          <Route path="/assistant" element={<AssistantPage />} />
-          {sections.map((section) => (
-            <Route
-              key={section.path}
-              path={`/${section.path}`}
-              element={<PlaceholderPage title={section.title} description={section.description} />}
-            />
-          ))}
-          <Route path="*" element={<NotFoundPage />} />
->>>>>>> 64ab278f5c5d108b4b2cf627cd460dc6ba75ba08
         </Route>
       </Routes>
     </BrowserRouter>
