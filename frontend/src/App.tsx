@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react'
 import { BrowserRouter, Link, Navigate, Route, Routes } from 'react-router-dom'
 import { MainLayout } from './components/layout/MainLayout'
+import { AuthenticatedCanvasLayout } from './components/layout/AuthenticatedCanvasLayout'
 import { DatasetProvider } from './context/DatasetContext'
 import { SkeletonCard, SkeletonPage, SkeletonStats } from './components/ui/Skeleton'
 import { AuthProvider } from './auth/AuthContext'
@@ -35,21 +36,23 @@ function App() {
     <Route path="/" element={<LandingPage />} />
     <Route path="/login" element={<LoginPage />} />
     <Route element={<ProtectedRoute />}>
-      <Route element={<DatasetProvider><MainLayout /></DatasetProvider>}>
-        <Route path="/dashboard" element={<ProtectedRoute roles={ROUTE_ROLES.admin} />}><Route index element={<Suspense fallback={<PageFallback />}><DashboardPage /></Suspense>} /></Route>
-        <Route path="/datasets" element={<ProtectedRoute roles={ROUTE_ROLES.admin} />}><Route index element={<Suspense fallback={<PageFallback />}><DatasetsPage /></Suspense>} /></Route>
-        <Route path="/timetable" element={<ProtectedRoute roles={ROUTE_ROLES.teaching} />}><Route index element={<Suspense fallback={<PageFallback />}><TimetablePage /></Suspense>} /></Route>
-        <Route path="/rooms" element={<ProtectedRoute roles={ROUTE_ROLES.venue} />}><Route index element={<Suspense fallback={<PageFallback />}><RoomsPage /></Suspense>} /></Route>
-        <Route path="/bookings" element={<ProtectedRoute roles={ROUTE_ROLES.venue} />}><Route index element={<Suspense fallback={<PageFallback />}><BookingsPage /></Suspense>} /></Route>
-        <Route path="/examinations" element={<ProtectedRoute roles={ROUTE_ROLES.adminDepartment} />}><Route index element={<Suspense fallback={<PageFallback />}><ExaminationsPage /></Suspense>} /></Route>
-        <Route path="/disruptions" element={<ProtectedRoute roles={ROUTE_ROLES.teaching} />}><Route index element={<Suspense fallback={<PageFallback />}><DisruptionsPage /></Suspense>} /></Route>
-        <Route path="/assistant" element={<ProtectedRoute roles={ROUTE_ROLES.teaching} />}><Route index element={<Suspense fallback={<PageFallback />}><AssistantPage /></Suspense>} /></Route>
-        <Route path="/analytics" element={<ProtectedRoute roles={ROUTE_ROLES.admin} />}><Route index element={<Suspense fallback={<PageFallback />}><AnalyticsPage /></Suspense>} /></Route>
-        <Route path="/settings" element={<ProtectedRoute roles={ROUTE_ROLES.admin} />}><Route index element={<Suspense fallback={<PageFallback />}><SettingsPage /></Suspense>} /></Route>
-        <Route path="*" element={<Suspense fallback={<PageFallback />}><NotFoundPage /></Suspense>} />
+      <Route element={<AuthenticatedCanvasLayout />}>
+        <Route element={<DatasetProvider><MainLayout /></DatasetProvider>}>
+          <Route path="/dashboard" element={<ProtectedRoute roles={ROUTE_ROLES.admin} />}><Route index element={<Suspense fallback={<PageFallback />}><DashboardPage /></Suspense>} /></Route>
+          <Route path="/datasets" element={<ProtectedRoute roles={ROUTE_ROLES.admin} />}><Route index element={<Suspense fallback={<PageFallback />}><DatasetsPage /></Suspense>} /></Route>
+          <Route path="/timetable" element={<ProtectedRoute roles={ROUTE_ROLES.teaching} />}><Route index element={<Suspense fallback={<PageFallback />}><TimetablePage /></Suspense>} /></Route>
+          <Route path="/rooms" element={<ProtectedRoute roles={ROUTE_ROLES.venue} />}><Route index element={<Suspense fallback={<PageFallback />}><RoomsPage /></Suspense>} /></Route>
+          <Route path="/bookings" element={<ProtectedRoute roles={ROUTE_ROLES.venue} />}><Route index element={<Suspense fallback={<PageFallback />}><BookingsPage /></Suspense>} /></Route>
+          <Route path="/examinations" element={<ProtectedRoute roles={ROUTE_ROLES.adminDepartment} />}><Route index element={<Suspense fallback={<PageFallback />}><ExaminationsPage /></Suspense>} /></Route>
+          <Route path="/disruptions" element={<ProtectedRoute roles={ROUTE_ROLES.teaching} />}><Route index element={<Suspense fallback={<PageFallback />}><DisruptionsPage /></Suspense>} /></Route>
+          <Route path="/assistant" element={<ProtectedRoute roles={ROUTE_ROLES.teaching} />}><Route index element={<Suspense fallback={<PageFallback />}><AssistantPage /></Suspense>} /></Route>
+          <Route path="/analytics" element={<ProtectedRoute roles={ROUTE_ROLES.admin} />}><Route index element={<Suspense fallback={<PageFallback />}><AnalyticsPage /></Suspense>} /></Route>
+          <Route path="/settings" element={<ProtectedRoute roles={ROUTE_ROLES.admin} />}><Route index element={<Suspense fallback={<PageFallback />}><SettingsPage /></Suspense>} /></Route>
+          <Route path="*" element={<Suspense fallback={<PageFallback />}><NotFoundPage /></Suspense>} />
+        </Route>
+        <Route path="/forbidden" element={<ProtectedRoute roles={ROUTE_ROLES.signedIn} />}><Route index element={<ForbiddenPage />} /></Route>
       </Route>
     </Route>
-    <Route path="/forbidden" element={<ProtectedRoute roles={ROUTE_ROLES.signedIn} />}><Route index element={<ForbiddenPage />} /></Route>
     <Route path="*" element={<Navigate to="/" replace />} />
   </Routes></AuthProvider></BrowserRouter>
 }

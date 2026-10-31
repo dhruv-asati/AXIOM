@@ -1,0 +1,63 @@
+.greeting-intro-overlay {
+  position: fixed;
+  z-index: 10000;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: auto;
+  background: #1f3e78;
+}
+
+.greeting-intro-curtain {
+  position: absolute;
+  inset: 0;
+  background: transparent;
+  will-change: transform;
+}
+
+.greeting-intro-shape {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  fill: #1f3e78;
+}
+
+.greeting-intro-grid {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  display: grid;
+  perspective: 100px;
+}
+
+.greeting-intro-tile {
+  display: block;
+  min-width: 0;
+  min-height: 0;
+  background: #fff;
+  backface-visibility: hidden;
+  transform-origin: center center;
+  will-change: background-color, transform;
+}
+
+.greeting-intro-word {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  left: 50%;
+  max-width: calc(100vw - 32px);
+  color: #fff;
+  font-family: 'Noto Sans Gurmukhi', 'Noto Sans Kannada', Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: clamp(32px, 5vw, 64px);
+  font-weight: 600;
+  letter-spacing: -.035em;
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
+  transform: translate(-50%, -50%);
+  will-change: opacity, transform;
+}
+
+@media (max-width: 600px) {
+  .greeting-intro-word { font-size: clamp(32px, 8vw, 42px); white-space: normal; }
+}

@@ -14,6 +14,7 @@ import {
 import type { UserRole } from '../../auth/AuthContext'
 
 export type NavigationEntry = {
+  id: string
   label: string
   to: string
   icon: LucideIcon
@@ -25,22 +26,27 @@ const adminDepartment: UserRole[] = ['admin', 'department_coordinator']
 const teaching: UserRole[] = ['admin', 'department_coordinator', 'faculty']
 const venue: UserRole[] = ['admin', 'department_coordinator', 'club_representative']
 export const primaryNavigation: NavigationEntry[] = [
-  { label: 'Overview', to: '/dashboard', icon: LayoutDashboard, roles: admin },
-  { label: 'Datasets', to: '/datasets', icon: Database, roles: admin },
-  { label: 'Timetable', to: '/timetable', icon: CalendarDays, roles: teaching },
-  { label: 'Room Management', to: '/rooms', icon: Warehouse, roles: venue },
-  { label: 'Bookings', to: '/bookings', icon: TicketCheck, roles: venue },
-  { label: 'Examinations', to: '/examinations', icon: BookOpenCheck, roles: adminDepartment },
-  { label: 'Disruptions', to: '/disruptions', icon: ShieldAlert, roles: teaching },
-  { label: 'Assistant', to: '/assistant', icon: Bot, roles: teaching },
-  { label: 'Analytics', to: '/analytics', icon: BarChart3, roles: admin },
+  { id: 'overview', label: 'Overview', to: '/dashboard', icon: LayoutDashboard, roles: admin },
+  { id: 'datasets', label: 'Datasets', to: '/datasets', icon: Database, roles: admin },
+  { id: 'timetable', label: 'Timetable', to: '/timetable', icon: CalendarDays, roles: teaching },
+  { id: 'rooms', label: 'Room Management', to: '/rooms', icon: Warehouse, roles: venue },
+  { id: 'bookings', label: 'Bookings', to: '/bookings', icon: TicketCheck, roles: venue },
+  { id: 'examinations', label: 'Examinations', to: '/examinations', icon: BookOpenCheck, roles: adminDepartment },
+  { id: 'disruptions', label: 'Disruptions', to: '/disruptions', icon: ShieldAlert, roles: teaching },
+  { id: 'assistant', label: 'Assistant', to: '/assistant', icon: Bot, roles: teaching },
+  { id: 'analytics', label: 'Analytics', to: '/analytics', icon: BarChart3, roles: admin },
 ]
 
 export const settingsNavigation: NavigationEntry = {
+  id: 'settings',
   label: 'Settings',
   to: '/settings',
   icon: Settings2,
   roles: admin,
+}
+
+export function getNavigationForRole(role: UserRole): NavigationEntry[] {
+  return [...primaryNavigation, settingsNavigation].filter((item) => item.roles.includes(role))
 }
 
 export const routeTitles: Record<string, string> = {

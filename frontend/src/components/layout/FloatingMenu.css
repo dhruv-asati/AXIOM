@@ -1,0 +1,83 @@
+.floating-menu-root {
+  --floating-menu-gap: 6px;
+  position: fixed;
+  z-index: 80;
+  top: 20px;
+  right: 20px;
+  font-family: inherit;
+}
+.floating-menu-root[data-corner="top-left"] { top: 20px; right: auto; bottom: auto; left: 20px; }
+.floating-menu-root[data-corner="bottom-right"] { top: auto; right: 20px; bottom: 20px; left: auto; }
+.floating-menu-root[data-corner="bottom-left"] { top: auto; right: auto; bottom: 20px; left: 20px; }
+.floating-menu {
+  width: 62px;
+  max-height: min(82vh, 650px);
+  padding: 12px 8px;
+  overflow-y: auto;
+  border-radius: 9999px;
+  color: #fff;
+  background: #000;
+  box-shadow: 0 9px 28px rgba(7, 13, 24, .22), 0 1px 3px rgba(7, 13, 24, .18);
+  scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 12px, #000 calc(100% - 12px), transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 12px, #000 calc(100% - 12px), transparent 100%);
+}
+.floating-menu::-webkit-scrollbar { display: none; }
+.floating-menu-items { display: flex; flex-direction: column; align-items: center; gap: var(--floating-menu-gap); }
+.floating-menu-entry { position: relative; display: grid; width: 44px; height: 44px; flex: 0 0 auto; place-items: center; }
+.floating-menu-button, .floating-menu-mobile-toggle {
+  position: relative;
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: #fff;
+  background: transparent;
+  cursor: pointer;
+  transition: background-color .15s ease, transform .15s ease, color .15s ease;
+}
+.floating-menu-button:hover, .floating-menu-button:focus-visible, .floating-menu-entry.is-expanded .floating-menu-button { background: rgba(255,255,255,.16); transform: scale(1.04); }
+.floating-menu-button.is-active { background: rgba(255,255,255,.13); }
+.floating-menu-button.is-danger:hover { color: #ffaaa5; }
+.floating-menu-button:focus-visible, .floating-menu-mobile-toggle:focus-visible { outline: 2px solid #93b4ff; outline-offset: 2px; }
+.floating-menu-badge { position: absolute; top: 5px; right: 5px; display: grid; min-width: 9px; height: 9px; place-items: center; padding: 0 2px; border: 1.5px solid #000; border-radius: 999px; color: #fff; background: #3b82f6; font-size: 8px; line-height: 1; }
+.floating-menu-tooltip { position: absolute; z-index: 3; top: 50%; right: calc(100% + 11px); display: flex; align-items: center; gap: 9px; width: max-content; max-width: min(240px, calc(100vw - 100px)); padding: 8px 10px; border: 1px solid rgba(255,255,255,.1); border-radius: 7px; color: #fff; background: #080a0d; box-shadow: 0 6px 18px rgba(0,0,0,.2); font-size: 11px; font-weight: 550; line-height: 1.25; white-space: nowrap; opacity: 0; pointer-events: none; transform: translate(6px, -50%); transition: opacity .12s ease, transform .12s ease; }
+.floating-menu-entry:hover .floating-menu-tooltip, .floating-menu-entry:focus-within .floating-menu-tooltip { opacity: 1; transform: translate(0, -50%); }
+.floating-menu-tooltip kbd { min-width: 18px; padding: 2px 4px; border: 1px solid rgba(255,255,255,.25); border-radius: 4px; color: #d7dce3; font: inherit; font-size: 9px; text-align: center; }
+.floating-menu-panel { position: absolute; z-index: 5; top: 50%; right: calc(100% + 12px); width: 258px; max-width: calc(100vw - 104px); padding: 14px; border: 1px solid #e6e9ee; border-radius: 12px; color: #26364a; background: #fff; box-shadow: 0 16px 40px rgba(14,25,41,.2); animation: floating-panel-in .13s ease both; }
+.floating-menu-entry:has(.floating-menu-panel) .floating-menu-tooltip { display: none; }
+.floating-menu-panel-content h2 { margin: 0 0 11px; color: #8290a0; font-size: 9px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+.floating-menu-dataset-select { display: grid; gap: 7px; color: #6f7c8b; font-size: 10px; }
+.floating-menu-dataset-select select { width: 100%; min-width: 0; padding: 8px 9px; border: 1px solid #e1e6ed; border-radius: 7px; color: #344357; background: #fff; font: inherit; font-size: 11px; }
+.floating-menu-panel-note { margin: 8px 0 0; color: #a0aab6; font-size: 9px; line-height: 1.5; }
+.floating-menu-account { display: grid; gap: 4px; }
+.floating-menu-account strong { color: #304158; font-size: 12px; }
+.floating-menu-account span { color: #788697; font-size: 10px; line-height: 1.45; }
+@keyframes floating-panel-in { from { opacity: 0; transform: translateY(-50%) translateX(4px); } to { opacity: 1; transform: translateY(-50%) translateX(0); } }
+
+.floating-menu-root[data-corner$="left"] .floating-menu-tooltip { right: auto; left: calc(100% + 11px); transform: translate(-6px, -50%); }
+.floating-menu-root[data-corner$="left"] .floating-menu-entry:hover .floating-menu-tooltip, .floating-menu-root[data-corner$="left"] .floating-menu-entry:focus-within .floating-menu-tooltip { transform: translate(0, -50%); }
+.floating-menu-root[data-corner$="left"] .floating-menu-panel { right: auto; left: calc(100% + 12px); }
+.floating-menu-root[data-corner$="left"] .floating-menu-entry:has(.floating-menu-panel) .floating-menu-tooltip { display: none; }
+
+.floating-menu-mobile-toggle { display: none; }
+@media (max-width: 760px) {
+  .floating-menu-root { top: 14px; right: 14px; }
+  .floating-menu-root[data-corner="top-left"] { top: 14px; left: 14px; }
+  .floating-menu-root[data-corner="bottom-right"] { right: 14px; bottom: 14px; }
+  .floating-menu-root[data-corner="bottom-left"] { bottom: 14px; left: 14px; }
+  .floating-menu-mobile-toggle { display: grid; width: 48px; height: 48px; color: #fff; background: #000; box-shadow: 0 7px 22px rgba(7,13,24,.2); }
+  .floating-menu { display: none; width: 56px; max-height: min(72vh, 540px); margin-top: 8px; padding: 9px 6px; }
+  .floating-menu-root[data-corner^="bottom"] .floating-menu { position: absolute; bottom: 56px; margin: 0 0 8px; }
+  .floating-menu-root[data-corner$="right"] .floating-menu { right: 0; }
+  .floating-menu-root[data-corner$="left"] .floating-menu { left: 0; }
+  .floating-menu.is-mobile-open { display: block; animation: floating-mobile-in .14s ease both; }
+  .floating-menu-entry { width: 42px; height: 42px; }
+  .floating-menu-button { width: 42px; height: 42px; }
+  .floating-menu-panel { max-width: calc(100vw - 86px); }
+}
+@keyframes floating-mobile-in { from { opacity: 0; transform: translateY(-4px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@media (prefers-reduced-motion: reduce) { .floating-menu *, .floating-menu-root * { animation-duration: .01ms !important; transition-duration: .01ms !important; } }

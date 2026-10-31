@@ -1,0 +1,160 @@
+.hover-member {
+  --member-word-color: #fff;
+  --member-accent-color: #d63a44;
+  --member-cursor-color: #d63a44;
+  position: relative;
+  width: 100%;
+  max-width: 1120px;
+  margin-inline: auto;
+  padding-top: 9px;
+  overflow: hidden;
+}
+
+.hover-member-avatar-row {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: clamp(5px, 1vw, 10px);
+  min-height: clamp(42px, 5vw, 56px);
+}
+
+.hover-member-avatar {
+  position: relative;
+  display: block;
+  width: clamp(34px, 4.15vw, 52px);
+  height: clamp(34px, 4.15vw, 52px);
+  flex: 0 0 auto;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, .62);
+  border-radius: 8px;
+  background: transparent;
+  box-shadow: 0 3px 12px rgba(13, 22, 36, .12);
+  cursor: pointer;
+  transition: transform .24s cubic-bezier(.2,.8,.2,1), box-shadow .24s ease;
+  transform-origin: center bottom;
+}
+
+.hover-member-avatar img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.hover-member-avatar:hover,
+.hover-member-avatar:focus-visible,
+.hover-member-avatar.is-active {
+  z-index: 5;
+  outline: none;
+  box-shadow: 0 8px 20px rgba(13, 22, 36, .22);
+  transform: translateY(-8px) scale(1.72);
+}
+
+.hover-member-cursor {
+  position: absolute;
+  z-index: 6;
+  top: 0;
+  left: 0;
+  display: grid;
+  width: 60px;
+  height: 60px;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  background: var(--member-cursor-color);
+  box-shadow: 0 7px 18px rgba(83, 19, 30, .18);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .16s ease, scale .22s ease;
+  scale: .6;
+}
+
+.hover-member[data-active="true"] .hover-member-cursor {
+  scale: 1;
+  opacity: 1;
+}
+
+.hover-member-word {
+  position: relative;
+  width: 100%;
+  height: clamp(76px, 16.1vw, 217px);
+  margin-top: -4px;
+  overflow: hidden;
+  color: var(--member-word-color);
+  font-family: Anton, Impact, sans-serif;
+  font-size: clamp(76px, 16.1vw, 217px);
+  font-weight: 400;
+  letter-spacing: .015em;
+  line-height: .92;
+  text-align: center;
+  text-shadow: 0 2px 12px rgba(22, 36, 57, .3);
+  -webkit-text-stroke: 1px rgba(32, 45, 64, .42);
+  transition: color .18s ease;
+}
+
+.hover-member-word.is-highlighted { color: var(--member-accent-color); }
+
+.hover-member-word-layer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  white-space: pre;
+}
+
+.hover-member-old { color: var(--member-word-color); }
+.hover-member-new { color: var(--member-accent-color); }
+.hover-member-word-layer.is-idle-hidden { visibility: hidden; }
+
+.hover-member-letter-clip {
+  display: inline-flex;
+  height: 1em;
+  align-items: center;
+  overflow: hidden;
+}
+
+.hover-member-letter { display: inline-block; }
+
+.hover-member-description {
+  max-width: 740px;
+  min-height: 23px;
+  margin: -16px auto 0;
+  color: #52647f;
+  font-size: clamp(10px, 1.1vw, 14px);
+  line-height: 1.55;
+  text-align: center;
+  animation: hover-member-description-in .2s ease both;
+}
+
+@keyframes hover-member-description-in {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.login-team {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  margin: 0 0 17px;
+}
+
+.login-team .hover-member { max-width: 570px; }
+.login-team .hover-member-avatar { width: clamp(32px, 3.4vw, 43px); height: clamp(32px, 3.4vw, 43px); }
+.login-team .hover-member-word { height: clamp(82px, 9vw, 120px); font-size: clamp(82px, 9vw, 120px); }
+.login-team .hover-member-cursor { width: 52px; height: 52px; }
+
+@media (max-width: 720px) {
+  .hover-member-avatar { width: clamp(36px, 9vw, 64px); height: clamp(36px, 9vw, 64px); }
+  .hover-member-word { height: clamp(56px, 16.1vw, 98px); font-size: clamp(56px, 16.1vw, 98px); }
+  .login-team { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hover-member-description { animation: none; }
+  .hover-member-avatar { transition: none; }
+  .hover-member-cursor { transition: opacity .18s ease; }
+}

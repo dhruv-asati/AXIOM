@@ -1,0 +1,24 @@
+.crowd-canvas-layer {
+  position: fixed;
+  z-index: 0;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: transparent;
+}
+
+.crowd-canvas {
+  display: block;
+  max-width: none;
+  opacity: .69;
+  filter: blur(.45px) contrast(1.4) brightness(.82) saturate(1.05);
+  pointer-events: none;
+}
+
+.crowd-canvas-fallback {
+  background: radial-gradient(ellipse at 68% 40%, rgba(81, 103, 166, .045), transparent 58%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .crowd-canvas-layer { background-color: transparent; }
+}

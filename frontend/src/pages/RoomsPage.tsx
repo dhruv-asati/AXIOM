@@ -9,6 +9,7 @@ import type { DatasetCalendar, RoomRecord, ScheduleSummary } from '../types/api'
 import './Operations.css'
 import { SkeletonPage, SkeletonCard } from '../components/ui/Skeleton'
 import { useAuth } from '../auth/AuthContext'
+import { SmoothInput } from '../components/ui/SmoothInput'
 
 export function RoomsPage() {
   const { user } = useAuth()
@@ -107,7 +108,7 @@ export function RoomsPage() {
       <p><strong>Features:</strong> {room.features.length ? room.features.join(', ') : 'None listed'}</p>
       <p><strong>Allowed use:</strong> {room.allowed_uses.join(', ') || 'Not specified'}</p>
       <p><strong>Department ownership:</strong> {room.department ?? 'Unassigned'}</p>
-      {user?.role === 'admin' && <div className="ops-fields"><label className="ops-field">Assign department<input value={departmentDrafts[room.room_id] ?? room.department ?? ''} onChange={(event) => setDepartmentDrafts((current) => ({ ...current, [room.room_id]: event.target.value }))} placeholder="Use a department in this dataset" /></label><button className="ops-button" type="button" onClick={() => void saveDepartment(room)}>Save ownership</button></div>}
+      {user?.role === 'admin' && <div className="ops-fields"><label className="ops-field">Assign department<SmoothInput value={departmentDrafts[room.room_id] ?? room.department ?? ''} onChange={(event) => setDepartmentDrafts((current) => ({ ...current, [room.room_id]: event.target.value }))} placeholder="Use a department in this dataset" /></label><button className="ops-button" type="button" onClick={() => void saveDepartment(room)}>Save ownership</button></div>}
       <span className="ops-mono ops-inline-note">{room.room_id}</span>
     </article>)}</div>}
   </div>

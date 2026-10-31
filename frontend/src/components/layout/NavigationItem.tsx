@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom'
+import { AnimatedNavLink } from '../ui/AnimatedLink'
 import type { NavigationEntry } from './navigation'
 
 type NavigationItemProps = {
@@ -10,15 +10,17 @@ export function NavigationItem({ item, onNavigate }: NavigationItemProps) {
   const Icon = item.icon
 
   return (
-    <NavLink
+    <AnimatedNavLink
       to={item.to}
       end
+      variant="underline"
+      activeClassName="is-active"
       onClick={onNavigate}
-      className={({ isActive }) => `navigation-item${isActive ? ' is-active' : ''}`}
+      className="navigation-item"
       title={item.label}
     >
       <Icon aria-hidden="true" size={18} strokeWidth={1.8} />
-      <span>{item.label}</span>
-    </NavLink>
+      <span className="animated-link-label">{item.label}</span>
+    </AnimatedNavLink>
   )
 }

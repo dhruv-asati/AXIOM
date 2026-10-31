@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { AlertCircle, CheckCircle2, FileWarning } from 'lucide-react'
+import { SmoothTextarea } from '../ui/SmoothTextarea'
 
 export function DisruptionRequestForm() {
   const [description, setDescription] = useState('')
@@ -21,7 +22,7 @@ export function DisruptionRequestForm() {
   return (
     <form className="disruption-request-form" onSubmit={validateLocally} noValidate>
       <label htmlFor="disruption-description">Disruption description <span aria-hidden="true">*</span></label>
-      <textarea
+      <SmoothTextarea
         id="disruption-description"
         rows={5}
         value={description}

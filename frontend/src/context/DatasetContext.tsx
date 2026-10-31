@@ -14,9 +14,22 @@ type DatasetContextValue = {
 
 const DatasetContext = createContext<DatasetContextValue | null>(null)
 
+function readSavedDatasetId(): string {
+  try { return localStorage.getItem('axiom.datasetId') ?? '' } catch { return '' }
+}
+
+function saveDatasetId(id: string) {
+  try {
+    if (id) localStorage.setItem('axiom.datasetId', id)
+    else localStorage.removeItem('axiom.datasetId')
+  } catch {
+    // Dataset selection remains usable for this session when browser storage is blocked.
+  }
+}
+
 export function DatasetProvider({ children }: { children: ReactNode }) {
   const [datasets, setDatasets] = useState<DatasetSummary[]>([])
-  const [selectedDatasetId, setSelectedDatasetId] = useState(() => localStorage.getItem('axiom.datasetId') ?? '')
+  const [selectedDatasetId, setSelectedDatasetId] = useState(readSavedDatasetId)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const refreshController = useRef<AbortController | null>(null)
@@ -33,8 +46,7 @@ export function DatasetProvider({ children }: { children: ReactNode }) {
       setDatasets(result)
       setSelectedDatasetId((current) => {
         const next = result.some((dataset) => dataset.id === current) ? current : result[0]?.id ?? ''
-        if (next) localStorage.setItem('axiom.datasetId', next)
-        else localStorage.removeItem('axiom.datasetId')
+        saveDatasetId(next)
         return next
       })
     } catch (cause) {
@@ -52,8 +64,7 @@ export function DatasetProvider({ children }: { children: ReactNode }) {
 
   const selectDataset = useCallback((id: string) => {
     setSelectedDatasetId(id)
-    if (id) localStorage.setItem('axiom.datasetId', id)
-    else localStorage.removeItem('axiom.datasetId')
+    saveDatasetId(id)
   }, [])
 
   const value = useMemo(() => ({

@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { apiRequest, invalidateApiCache, setCsrfToken } from '../api/client'
+import { clearGreetingIntro } from '../lib/greetingIntro'
 export { homeForRole } from './roleAccess.mjs'
 
 export type UserRole = 'admin' | 'department_coordinator' | 'faculty' | 'club_representative'
@@ -62,6 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     await apiRequest<void>('/auth/logout', { method: 'POST' })
+    clearGreetingIntro()
     invalidateApiCache()
     setCsrfToken('')
     setUser(null)

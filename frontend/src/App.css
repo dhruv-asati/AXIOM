@@ -12,7 +12,6 @@
   --accent: #4c68d8;
   --accent-deep: #3955c2;
   --accent-wash: #edf0fc;
-  --sidebar-width: 256px;
   color: var(--ink-950);
   background: var(--canvas);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -32,7 +31,8 @@ a { color: inherit; text-decoration: none; }
 button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid #8fa4ff; outline-offset: 3px; }
 #root { min-height: 100vh; }
 
-.application-shell { min-height: 100vh; }
+.application-shell { position: relative; z-index: 1; min-height: 100vh; }
+.forbidden-page { position: relative; z-index: 1; }
 .app-sidebar {
   position: fixed; z-index: 50; inset: 0 auto 0 0; display: flex; width: var(--sidebar-width);
   flex-direction: column; padding: 25px 16px 16px; color: #d5dce6; background: var(--navy-950);
@@ -58,7 +58,7 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 .sidebar-footnote strong { color: #d8dfe8; font-size: 10.5px; font-weight: 600; }
 .sidebar-footnote small { margin-top: 3px; color: #7f8b9c; font-size: 9.5px; }
 
-.workspace { min-height: 100vh; margin-left: var(--sidebar-width); }
+.workspace { min-height: 100vh; }
 .top-navbar { position: sticky; z-index: 20; top: 0; display: flex; height: 70px; align-items: center; justify-content: space-between; gap: 20px; padding: 0 42px; border-bottom: 1px solid var(--line); background: rgba(255,255,255,.94); backdrop-filter: blur(14px); }
 .navbar-leading, .navbar-actions { display: flex; min-width: 0; align-items: center; }
 .navbar-leading { gap: 14px; }
@@ -100,7 +100,9 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 .profile-logout-error { display: block; padding: 4px 10px 8px; color: #ad4541; font-size: 9px; line-height: 1.45; }
 .mobile-menu-button { display: none; }
 
-.main-content { min-height: calc(100vh - 70px); padding: 0 42px 0; }
+.main-content { position: relative; z-index: 1; min-height: 100vh; padding: 0 42px; }
+.application-shell:has(.floating-menu-root[data-corner$="right"]) .main-content { padding-right: 98px; }
+.application-shell:has(.floating-menu-root[data-corner$="left"]) .main-content { padding-left: 98px; }
 .content-container { width: min(100%, 1120px); margin: 0 auto; padding: 43px 0 64px; }
 .page-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 31px; }
 .page-eyebrow, .section-eyebrow { margin: 0 0 9px; color: #8391a0; font-size: 9px; font-weight: 700; letter-spacing: .15em; }
@@ -158,7 +160,6 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 .sidebar-backdrop { display: none; }
 
 @media (max-width: 1180px) {
-  :root { --sidebar-width: 82px; }
   .app-sidebar { align-items: center; padding-right: 10px; padding-left: 10px; }
   .brand-lockup { padding: 0; }
   .brand-wordmark, .sidebar-section-label, .navigation-item span, .sidebar-footnote { display: none; }
@@ -168,12 +169,13 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
   .sidebar-bottom { width: 100%; margin-top: auto; }
   .sidebar-bottom .navigation-item { display: flex; }
   .top-navbar, .main-content { padding-right: 30px; padding-left: 30px; }
+  .application-shell:has(.floating-menu-root[data-corner$="right"]) .main-content { padding-right: 92px; }
+  .application-shell:has(.floating-menu-root[data-corner$="left"]) .main-content { padding-left: 92px; }
   .workspace-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .intro-orbit { right: 42px; }
 }
 
 @media (max-width: 760px) {
-  :root { --sidebar-width: 256px; }
   .app-sidebar { width: var(--sidebar-width); align-items: stretch; padding: 22px 16px 16px; transform: translateX(-102%); box-shadow: none; }
   .app-sidebar.is-open { transform: translateX(0); box-shadow: 18px 0 42px rgba(12,22,37,.2); }
   .brand-lockup { padding: 0 10px; }
@@ -187,7 +189,6 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
   .sidebar-bottom .navigation-item { display: flex; }
   .sidebar-footnote { display: flex; }
   .sidebar-backdrop { position: fixed; z-index: 40; inset: 0; display: block; width: 100%; height: 100%; border: 0; background: rgba(15,25,40,.38); }
-  .workspace { margin-left: 0; }
   .top-navbar { height: 62px; padding: 0 18px; }
   .navbar-leading { gap: 9px; }
   .mobile-menu-button { display: grid; margin-left: -8px; }
@@ -200,7 +201,9 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
   .profile-copy, .profile-chevron { display: none; }
   .profile-button { padding: 0; }
   .profile-avatar { width: 32px; height: 32px; }
-  .main-content { min-height: calc(100vh - 62px); padding: 0 20px; }
+  .main-content { min-height: 100vh; padding: 0 20px; }
+  .application-shell:has(.floating-menu-root[data-corner$="right"]) .main-content { padding-right: 72px; }
+  .application-shell:has(.floating-menu-root[data-corner$="left"]) .main-content { padding-left: 72px; }
   .content-container { padding: 32px 0 46px; }
   .page-header { margin-bottom: 25px; }
   .dashboard-intro { min-height: 220px; padding: 28px 25px; }
@@ -218,6 +221,8 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
   .notification-popover { right: -42px; width: min(285px, calc(100vw - 24px)); }
   .profile-menu { right: -3px; }
   .main-content { padding-right: 17px; padding-left: 17px; }
+  .application-shell:has(.floating-menu-root[data-corner$="right"]) .main-content { padding-right: 68px; }
+  .application-shell:has(.floating-menu-root[data-corner$="left"]) .main-content { padding-left: 68px; }
   .page-header h1 { font-size: 26px; }
   .page-description { font-size: 11px; }
   .dashboard-intro { min-height: 235px; padding: 25px 20px; }

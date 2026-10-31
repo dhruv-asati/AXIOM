@@ -1,5 +1,6 @@
 import { Search, SlidersHorizontal, X } from 'lucide-react'
 import type { TimetableSession } from '../../types/timetable'
+import { SmoothInput } from '../ui/SmoothInput'
 
 export type TimetableFilterValues = {
   department: string
@@ -62,7 +63,7 @@ export function TimetableFilters({ sessions, filters, onChange, onClear }: Timet
           <span>Search sessions</span>
           <span className="timetable-search-input">
             <Search size={15} aria-hidden="true" />
-            <input
+            <SmoothInput
               type="search"
               value={filters.search}
               onChange={(event) => onChange('search', event.target.value)}

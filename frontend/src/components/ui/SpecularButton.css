@@ -1,0 +1,4 @@
+.specular-button { position: relative; isolation: isolate; transition: transform .16s ease, filter .16s ease, box-shadow .16s ease; }
+.specular-button:not(:disabled):hover { filter: brightness(1.035); }
+.specular-button:disabled { cursor: not-allowed; }
+@media (prefers-reduced-motion: reduce) { .specular-button { transition: none; } }

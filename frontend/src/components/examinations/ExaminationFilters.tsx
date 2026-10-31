@@ -1,4 +1,5 @@
 import { Search, SlidersHorizontal, X } from 'lucide-react'
+import { SmoothInput } from '../ui/SmoothInput'
 import type { ExaminationView } from '../../types/examination'
 
 export type ExaminationFilterValues = { search: string; department: string; type: string; room: string; group: string }
@@ -24,7 +25,7 @@ export function ExaminationFilters({ examinations, values, onChange, onClear }: 
     <section className="examination-filters" aria-label="Examination search and filters">
       <div className="examination-filter-heading"><span><SlidersHorizontal size={14} />Search and filters</span><button type="button" onClick={onClear} disabled={!hasFilters}><X size={13} />Clear filters</button></div>
       <div className="examination-filter-grid">
-        <label className="examination-search-field"><span className="sr-only">Search examinations</span><Search size={15} aria-hidden="true" /><input type="search" value={values.search} onChange={(event) => onChange('search', event.target.value)} placeholder="Search exam, course, room or group" disabled={!enabled} /></label>
+        <label className="examination-search-field"><span className="sr-only">Search examinations</span><Search size={15} aria-hidden="true" /><SmoothInput type="search" value={values.search} onChange={(event) => onChange('search', event.target.value)} placeholder="Search exam, course, room or group" disabled={!enabled} /></label>
         {select('department', 'Department', uniqueOptions(examinations.map((exam) => exam.department ?? '')))}
         {select('type', 'Examination type', uniqueOptions(examinations.map((exam) => exam.examinationType ?? '')))}
         {select('room', 'Room', rooms, (option) => option.split(' · ').at(-1) ?? option)}

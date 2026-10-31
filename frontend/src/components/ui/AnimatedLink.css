@@ -1,0 +1,69 @@
+.animated-link {
+  --animated-link-color: currentColor;
+  position: relative;
+  text-decoration: none;
+}
+
+.animated-link::after {
+  position: absolute;
+  right: 0;
+  bottom: -.16em;
+  left: 0;
+  height: 1.5px;
+  background: var(--animated-link-color);
+  content: '';
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform .24s cubic-bezier(.2,.75,.25,1), opacity .2s ease;
+  opacity: .8;
+  pointer-events: none;
+}
+
+.animated-link--underline:hover::after,
+.animated-link--underline:focus-visible::after { transform: scaleX(1); }
+
+.animated-link--center::after { transform-origin: center; }
+.animated-link--center:hover::after,
+.animated-link--center:focus-visible::after { transform: scaleX(1); }
+
+.animated-link--reveal::after {
+  height: 100%;
+  bottom: 0;
+  z-index: -1;
+  opacity: .1;
+  transform-origin: left;
+}
+.animated-link--reveal:hover::after,
+.animated-link--reveal:focus-visible::after { transform: scaleX(1); }
+
+.animated-link--full::after { height: 2px; transform-origin: left; }
+.animated-link--full:hover::after,
+.animated-link--full:focus-visible::after { transform: scaleX(1); }
+
+.animated-link-arrow { flex: 0 0 auto; transition: transform .2s ease; }
+.animated-link:hover .animated-link-arrow,
+.animated-link:focus-visible .animated-link-arrow { transform: translate(2px,-2px); }
+
+.animated-nav-link::after { display: none; }
+.animated-link-label { position: relative; display: inline-block; }
+.animated-link-label::after {
+  position: absolute;
+  right: 0;
+  bottom: -2px;
+  left: 0;
+  height: 1px;
+  background: currentColor;
+  content: '';
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform .22s ease;
+}
+.animated-nav-link:hover .animated-link-label::after,
+.animated-nav-link:focus-visible .animated-link-label::after { transform: scaleX(1); }
+.animated-nav-link.is-active .animated-link-label::after { transform: scaleX(0); }
+
+@media (prefers-reduced-motion: reduce) {
+  .animated-link::after,
+  .animated-link-label::after,
+  .animated-link-arrow { transition: none; }
+}

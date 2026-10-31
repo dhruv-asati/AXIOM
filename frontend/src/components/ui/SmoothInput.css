@@ -1,0 +1,47 @@
+.smooth-input-shell {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-width: 0;
+}
+
+.smooth-input-shell > input,
+.smooth-input-shell > textarea {
+  display: block;
+  width: 100%;
+  min-width: 0;
+}
+
+.search-field > .smooth-input-shell,
+.timetable-search-input > .smooth-input-shell,
+.examination-search-field > .smooth-input-shell {
+  flex: 1 1 auto;
+}
+
+.smooth-input-caret {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  left: 0;
+  width: 2px;
+  height: 1em;
+  border-radius: 2px;
+  background: #5269ce;
+  box-shadow: 0 0 7px rgba(82, 105, 206, .42);
+  opacity: 0;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+.smooth-input-shell[data-caret-active="true"] > input {
+  caret-color: transparent !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .smooth-input-caret { box-shadow: none; }
+}
+
+@media (max-width: 900px) {
+  .search-field > .smooth-input-shell { display: none; }
+  .search-field:focus-within > .smooth-input-shell { display: block; }
+}

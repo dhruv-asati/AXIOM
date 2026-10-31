@@ -1,6 +1,6 @@
 import { ArrowRight, Compass } from 'lucide-react'
-import { Link } from 'react-router-dom'
 import { PageHeader } from '../components/layout/PageHeader'
+import { AnimatedLink } from '../components/ui/AnimatedLink'
 
 type PlaceholderPageProps = {
   title: string
@@ -16,7 +16,7 @@ export function PlaceholderPage({ title, description }: PlaceholderPageProps) {
         <p className="section-eyebrow">WORKSPACE IN PROGRESS</p>
         <h2>This area is being prepared.</h2>
         <p className="placeholder-description">The {title.toLowerCase()} workspace will take shape here as this part of AXIOM is developed.</p>
-        <Link to="/dashboard" className="text-link">Back to overview <ArrowRight size={16} /></Link>
+        <AnimatedLink to="/dashboard" variant="center" className="text-link">Back to overview <ArrowRight size={16} /></AnimatedLink>
       </section>
     </>
   )

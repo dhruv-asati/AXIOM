@@ -1,0 +1,27 @@
+.specular-effects-canvas { position: fixed; z-index: 0; inset: 0; display: block; width: 100vw; height: 100vh; pointer-events: none; }
+
+[data-specular-fallback="true"] { position: relative; }
+[data-specular-fallback="true"]::after {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  padding: 1px;
+  border-radius: inherit;
+  background: radial-gradient(ellipse 230px 150px at var(--specular-x, 50%) var(--specular-y, 0%), rgba(76,104,216,.55), rgba(130,151,224,.16) 38%, transparent 74%);
+  content: "";
+  opacity: .24;
+  pointer-events: none;
+  transition: opacity .18s ease;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+}
+[data-specular-fallback="true"][data-specular-near="true"]::after { opacity: .92; }
+[data-specular-fallback="true"]:hover::after, [data-specular-fallback="true"]:focus-visible::after { opacity: .78; }
+[data-specular-fallback="true"]:disabled::after, [data-specular-fallback="true"][aria-disabled="true"]::after { opacity: .14; }
+@media (hover: none) { [data-specular-fallback="true"]::after { opacity: .22; } }
+@media (prefers-reduced-motion: reduce) { [data-specular-fallback="true"]::after { transition: none; } }
+@supports not (mask-composite: exclude) {
+  [data-specular-fallback="true"]::after { padding: 0; background: none; box-shadow: inset 0 0 0 1px rgba(91,116,193,.22); }
+}

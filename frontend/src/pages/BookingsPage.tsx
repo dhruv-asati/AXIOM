@@ -11,6 +11,7 @@ import { useAuth } from '../auth/AuthContext'
 import { getDataset } from '../api/datasets'
 import type { DatasetCalendar } from '../types/api'
 import { canApproveDepartmentLabs, canReviewClassMoveBookings } from '../auth/roleAccess.mjs'
+import { SmoothInput } from '../components/ui/SmoothInput'
 
 export function BookingsPage() {
   const { user } = useAuth()
@@ -264,7 +265,7 @@ export function BookingsPage() {
     </section>}
     {maySubmit && showRequestForm && <section className="ops-card"><div className="ops-card-heading"><div><h2>New {user?.role === 'club_representative' ? 'club' : 'department'} venue request</h2><p>Requests use your authenticated role and organization. The booking engine makes deterministic decisions; submitting does not reserve a room.</p></div></div>
       {(!calendar || !eventRoomTypes.length) ? <div className="ops-empty"><strong>No event room options</strong><span>This dataset has no rooms marked for event use.</span></div> : <form className="ops-fields" onSubmit={(event) => void createRequest(event)}>
-        <label className="ops-field" style={{ flexBasis: '100%' }}>Request title<input required maxLength={500} value={requestTitle} onChange={(event) => setRequestTitle(event.target.value)} /></label>
+        <label className="ops-field" style={{ flexBasis: '100%' }}>Request title<SmoothInput required maxLength={500} value={requestTitle} onChange={(event) => setRequestTitle(event.target.value)} /></label>
         <label className="ops-field">Attendance<input type="number" min="1" max="100000" required value={attendance} onChange={(event) => setAttendance(event.target.value)} /></label>
         <label className="ops-field">Duration (periods)<input type="number" min="1" max="13" required value={duration} onChange={(event) => setDuration(event.target.value)} /></label>
         <label className="ops-field">Day<select required value={requestDay} onChange={(event) => setRequestDay(event.target.value)}>{calendar.days.filter((day) => ['MON', 'TUE', 'WED', 'THU', 'FRI'].includes(day)).map((day) => <option key={day} value={day}>{day}</option>)}</select></label>

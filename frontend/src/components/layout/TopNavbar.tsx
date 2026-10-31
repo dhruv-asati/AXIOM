@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Bell, Check, ChevronRight, Menu, Search, X } from 'lucide-react'
-import { Link, useLocation } from 'react-router-dom'
+import { useLocation } from 'react-router-dom'
+import { AnimatedLink } from '../ui/AnimatedLink'
+import { SmoothInput } from '../ui/SmoothInput'
 import { routeTitles } from './navigation'
 import { UserProfile } from './UserProfile'
 import { useDatasetContext } from '../../context/DatasetContext'
@@ -32,7 +34,7 @@ export function TopNavbar({ onMenuClick, isMobileMenuOpen }: TopNavbarProps) {
           {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
         <div className="breadcrumbs" aria-label="Breadcrumb">
-          <Link to={user ? homeForRole(user.role) : '/'}>Campus</Link>
+          <AnimatedLink to={user ? homeForRole(user.role) : '/'} variant="center">Campus</AnimatedLink>
           <ChevronRight size={14} aria-hidden="true" />
           <span aria-current="page">{title}</span>
         </div>
@@ -45,7 +47,7 @@ export function TopNavbar({ onMenuClick, isMobileMenuOpen }: TopNavbarProps) {
         </select></label>
         <label className="search-field">
           <Search size={17} aria-hidden="true" />
-          <input
+          <SmoothInput
             type="search"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
