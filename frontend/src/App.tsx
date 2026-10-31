@@ -7,9 +7,9 @@ import { RoomsPage } from './pages/RoomsPage'
 import { BookingsPage } from './pages/BookingsPage'
 import { TimetablePage } from './pages/TimetablePage'
 import { ExaminationsPage } from './pages/ExaminationsPage'
+import { DisruptionsPage } from './pages/DisruptionsPage'
 
 const sections = [
-  { path: 'disruptions', title: 'Disruptions', description: 'Coordinate schedule changes when campus plans are disrupted.' },
   { path: 'analytics', title: 'Analytics', description: 'Explore campus scheduling and room utilisation insights.' },
   { path: 'settings', title: 'Settings', description: 'Configure your AXIOM workspace preferences.' },
 ]
@@ -25,6 +25,7 @@ function App() {
           <Route path="/rooms" element={<RoomsPage />} />
           <Route path="/bookings" element={<BookingsPage />} />
           <Route path="/examinations" element={<ExaminationsPage />} />
+          <Route path="/disruptions" element={<DisruptionsPage />} />
           {sections.map((section) => (
             <Route
               key={section.path}
