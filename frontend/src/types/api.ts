@@ -87,6 +87,7 @@ export type BookingRequestRecord = {
   end_period: number | null
   room_id: string | null
   reason: string | null
+  created_by_user_id: string | null
 }
 
 export type RoomRecord = {
@@ -94,6 +95,7 @@ export type RoomRecord = {
   name: string
   building: string
   room_type: string
+  department: string | null
   capacity: number
   features: string[]
   accessible: boolean

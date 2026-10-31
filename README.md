@@ -69,16 +69,35 @@ Copy-Item .env.example .env.local
 npm run dev
 ```
 
-Vite prints the local app URL (normally `http://localhost:5173`). `VITE_API_URL` in `frontend/.env.local` controls the backend base URL. The dashboard uses the documented health endpoint as a liveness check; operational data remains unavailable until its API contracts are implemented. See [frontend setup and module status](frontend/README.md) and the [demo readiness guide](docs/FRONTEND_DEMO_READINESS.md).
+Vite prints the local app URL (normally `http://localhost:5173`). `VITE_API_URL` in `frontend/.env.local` controls the backend base URL. The public landing page is available at `/`; sign-in at `/login` uses the backend's HttpOnly session cookie. Protected navigation is based on the role returned by the server. See [frontend setup](frontend/README.md) and [role access and demo account setup](docs/ROLE_ACCESS.md).
+
+## Render deployment preparation
+
+The repository includes a root Dockerfile and Render Blueprint for one Docker web service. FastAPI serves the production-built React app and API from the same origin. Review [the Render deployment guide](docs/DEPLOYMENT_RENDER.md) before building or creating a Render service. Authentication and booking approvals require the pending migrations to be reviewed and applied before use. Database migrations remain manual and are never run at application startup.
+
+## Authentication and demo accounts
+
+AXIOM supports exactly four roles: `admin`, `department_coordinator`, `faculty`, and `club_representative`. There are no bundled usernames or passwords. Create four unique, strong credentials and provision them from a protected environment variable after applying the pending auth migration. Do not commit the values or place them in frontend configuration. Full steps and the per-role account context are in [docs/ROLE_ACCESS.md](docs/ROLE_ACCESS.md).
+
+| Demo account | Required account context |
+| --- | --- |
+| Admin | Campus-wide; no dataset or department assignment. |
+| Department coordinator | Imported dataset source ID and an existing department in that dataset. |
+| Faculty | Imported dataset source ID and a faculty source ID from that dataset; department is derived from the faculty record. |
+| Club representative | Imported dataset source ID and a club identifier. |
+
+After migrations and dataset import, set `AXIOM_DEMO_ACCOUNTS_JSON` to a JSON array containing exactly one object for each role (with unique username and password, plus that role's context), then run `python -m app.commands.provision_demo_accounts` from `backend/`. The command enforces 14-character minimum passwords, stores scrypt hashes, and does not print credentials. It is idempotent only when existing usernames, passwords and contexts match; it refuses to reset or overwrite an existing account. Assign department ownership to lab rooms in Room Management before using coordinator lab approvals. In Render, set the JSON as a protected secret, run the same command from the Render Shell, then privately share each account's username and initial password with judges. Never put populated JSON in the repository. See the linked guide for the exact JSON shape and PowerShell command.
 
 ## Database migrations
 
-Alembic is configured in `backend/alembic.ini`. Review migrations before applying; run from `backend/`:
+Alembic is configured in `backend/alembic.ini`; authentication and booking approvals use revisions `31c4d6a2f809` and `4a92d6c1e7b0`. Review generated SQL before applying. Run from `backend/`:
 
 ```powershell
 alembic revision --autogenerate -m "describe schema"
 alembic upgrade head
 ```
+
+Neither migration is applied automatically. Applying them adds authentication/session and booking-approval data; downgrading removes that new data, room ownership assignments, and recorded human decisions. Confirm `DATABASE_URL` and back up the database before any intentional apply or downgrade. Never use application startup to migrate a database.
 
 ## Generate and validate a timetable
 
@@ -109,7 +128,7 @@ python validator.py --data data/cit_public.json --schedule exports/schedule.json
 
 The application now includes dataset management, timetable generation and review, room directory and utilisation, examination allocations, booking review and deterministic booking decisions, a review-only request assistant, and disruption repair proposals. From the UI, use **Datasets** to import JSON plus optional CSV supplements, select the dataset in the top bar, generate a schedule in **Timetable**, then review bookings, examinations and rooms. Disruption proposals are solver-generated previews; approving one explicitly creates a new schedule and preserves the baseline.
 
-The assistant is a deterministic parser and proposal handoff. It does not approve bookings or disruptions. AXIOM does not yet implement authentication or authorization; run it only in a trusted environment. Dashboard and analytics values are read from the backend. Live room occupancy is intentionally shown as unavailable because no check-in telemetry source is connected.
+The assistant is a deterministic parser and proposal handoff. It does not approve bookings or disruptions. Authentication and four-role authorization are implemented, but the role-auth migration must be reviewed/applied and demo accounts provisioned before public use. Dashboard and analytics values are read from the backend. Live room occupancy is intentionally shown as unavailable because no check-in telemetry source is connected.
 
 ### Import through the application
 

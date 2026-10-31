@@ -199,6 +199,7 @@ def create_repair_proposal(
     request: DisruptionRequest,
     *,
     time_limit_seconds: float = 60,
+    created_by_user_id: UUID | None = None,
 ) -> dict[str, Any]:
     """Solve and persist a repair proposal without changing its baseline schedule."""
     transaction = db.begin_nested() if db.in_transaction() else db.begin()
@@ -370,6 +371,7 @@ def create_repair_proposal(
             dataset_id=dataset_id,
             baseline_schedule_id=schedule_id,
             status="proposed",
+            created_by_user_id=created_by_user_id,
             input_fingerprint=_input_fingerprint(
                 dataset, all_sessions, faculties, rooms_db, groups, courses, exams,
                 unavailability, session_rows, base_exams, removed_already,
@@ -417,7 +419,10 @@ def list_repair_proposals(db: Session, dataset_id: UUID) -> list[dict[str, Any]]
     return [_proposal_response(row) for row in rows]
 
 
-def approve_repair_proposal(db: Session, dataset_id: UUID, schedule_id: UUID, proposal_id: UUID) -> dict[str, Any]:
+def approve_repair_proposal(
+    db: Session, dataset_id: UUID, schedule_id: UUID, proposal_id: UUID, *,
+    decided_by_user_id: UUID | None = None, persist_disruption_changes: bool = True,
+) -> dict[str, Any]:
     transaction = db.begin_nested() if db.in_transaction() else db.begin()
     with transaction:
         dataset = db.scalar(select(Dataset).where(Dataset.id == dataset_id).with_for_update())
@@ -432,6 +437,8 @@ def approve_repair_proposal(db: Session, dataset_id: UUID, schedule_id: UUID, pr
             raise LookupError("Repair proposal not found for this dataset and baseline schedule")
         if proposal.status != "proposed":
             raise RepairError(f"Repair proposal is already {proposal.status}")
+        if decided_by_user_id is not None and proposal.created_by_user_id == decided_by_user_id:
+            raise RepairError("A user cannot approve their own repair proposal")
         baseline_schedule = db.scalar(select(Schedule).where(
             Schedule.id == schedule_id, Schedule.dataset_id == dataset_id,
         ))
@@ -465,6 +472,8 @@ def approve_repair_proposal(db: Session, dataset_id: UUID, schedule_id: UUID, pr
 
         changes = [TypeAdapter(DisruptionChange).validate_python(change) for change in proposal.changes]
         for change in changes:
+            if not persist_disruption_changes:
+                continue
             if change.type == "faculty_unavailable":
                 faculty = db.scalar(select(Faculty).where(
                     Faculty.dataset_id == dataset_id, Faculty.source_id == change.faculty_id,
@@ -550,6 +559,7 @@ def approve_repair_proposal(db: Session, dataset_id: UUID, schedule_id: UUID, pr
         proposal.status = "approved"
         proposal.approved_schedule_id = schedule.id
         proposal.decided_at = datetime.now(timezone.utc)
+        proposal.decided_by_user_id = decided_by_user_id
         db.flush()
         return _proposal_response(proposal)
 
@@ -560,6 +570,8 @@ def reject_repair_proposal(
     schedule_id: UUID,
     proposal_id: UUID,
     reason: str,
+    *,
+    decided_by_user_id: UUID | None = None,
 ) -> dict[str, Any]:
     transaction = db.begin_nested() if db.in_transaction() else db.begin()
     with transaction:
@@ -572,8 +584,11 @@ def reject_repair_proposal(
             raise LookupError("Repair proposal not found for this dataset and baseline schedule")
         if proposal.status != "proposed":
             raise RepairError(f"Repair proposal is already {proposal.status}")
+        if decided_by_user_id is not None and proposal.created_by_user_id == decided_by_user_id:
+            raise RepairError("A user cannot decide their own repair proposal")
         proposal.status = "rejected"
         proposal.explanation = f"{proposal.explanation} Rejected: {reason.strip()}"
         proposal.decided_at = datetime.now(timezone.utc)
+        proposal.decided_by_user_id = decided_by_user_id
         db.flush()
         return _proposal_response(proposal)

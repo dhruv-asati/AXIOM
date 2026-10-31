@@ -3,12 +3,13 @@ from __future__ import annotations
 import pytest
 import json
 from fastapi.testclient import TestClient
+from uuid import uuid4
 from sqlalchemy import create_engine, event, select
 from sqlalchemy.orm import Session
 
 from app.database.session import Base
 from app.models import (
-    Course, Dataset, Faculty, Room, RoomUnavailability, Schedule,
+    BookingClassMoveProposal, BookingOutcome, BookingRequest, Course, Dataset, Faculty, Room, RoomUnavailability, Schedule,
     ScheduleRepairProposal, ScheduleSessionAssignment, StudentGroup,
     TimetableSession,
 )
@@ -20,8 +21,14 @@ from app.services.disruptions.repair import (
     create_repair_proposal,
     reject_repair_proposal,
 )
+from app.services.bookings.approval import (
+    BookingApprovalError, create_class_move_proposal, decide_class_move_proposal,
+    decide_department_lab_booking,
+)
 from app.services.timetable.solver import generate_schedule, get_schedule_assignments
 from app.api.routes import get_db
+from app.api.security import current_user, require_csrf
+from app.models import User
 from app.main import app
 
 
@@ -241,6 +248,158 @@ def test_proposal_is_scoped_to_its_dataset_and_schedule(db):
     assert db.get(ScheduleRepairProposal, proposal["proposal_id"]).status == "proposed"
 
 
+def _make_class_move_booking(db, dataset, creator):
+    assignment = db.scalar(select(ScheduleSessionAssignment).where(ScheduleSessionAssignment.dataset_id == dataset.id))
+    room = db.scalar(select(Room).where(Room.dataset_id == dataset.id, Room.source_id == assignment.room_source_id))
+    room.allowed_uses = list(room.allowed_uses or []) + ["event"]
+    request = BookingRequest(
+        dataset_id=dataset.id, source_id="BOOK-MOVE-1", submitted_at=__import__("datetime").datetime.now(__import__("datetime").timezone.utc),
+        requester=creator.username, role="department_coordinator", department="CSE", requested_category="department_event",
+        title="Department seminar", attendance=25, duration_periods=1,
+        windows=[{"day": assignment.day, "from_period": assignment.start_period, "to_period": assignment.start_period}],
+        room_types=[room.type], needs=[], requested_room=room.source_id, mandatory_for_groups=[], raw_text="",
+        created_by_user_id=creator.id,
+    )
+    db.add(request); db.flush()
+    return assignment, room, request
+
+
+def test_booking_class_move_requires_admin_and_creates_new_schedule_without_persisting_temporary_block(db):
+    dataset, generated = seed_schedule(db)
+    requester = User(username="requesting-coordinator", password_hash="unused", role="department_coordinator", dataset_id=dataset.id, department="CSE")
+    admin = User(username="reviewing-admin", password_hash="unused", role="admin")
+    db.add_all([requester, admin]); db.flush()
+    assignment, room, request = _make_class_move_booking(db, dataset, requester)
+    original = get_schedule_assignments(db, dataset.id, generated.schedule_id)["assignments"]
+    proposal = create_class_move_proposal(
+        db, dataset_id=dataset.id, schedule_id=generated.schedule_id,
+        request_source_id=request.source_id, room_source_id=room.source_id,
+        day=assignment.day, start_period=assignment.start_period,
+        created_by_user_id=requester.id, time_limit_seconds=10,
+    )
+    db.flush()
+    assert proposal["status"] == "proposed"
+    assert get_schedule_assignments(db, dataset.id, generated.schedule_id)["assignments"] == original
+    assert db.scalar(select(RoomUnavailability).where(RoomUnavailability.dataset_id == dataset.id)) is None
+
+    decision = decide_class_move_proposal(db, dataset_id=dataset.id, proposal_id=proposal["proposal_id"], admin_id=admin.id, approve=True)
+    db.flush()
+    assert decision["status"] == "approved"
+    assert decision["approved_schedule_id"] != generated.schedule_id
+    assert db.get(BookingClassMoveProposal, proposal["proposal_id"]).decided_by_user_id == admin.id
+    assert db.get(BookingClassMoveProposal, proposal["proposal_id"]).decided_at is not None
+    assert db.scalar(select(BookingOutcome).where(BookingOutcome.schedule_id == decision["approved_schedule_id"], BookingOutcome.request_source_id == request.source_id)).decision_source == "class_move"
+    assert get_schedule_assignments(db, dataset.id, generated.schedule_id)["assignments"] == original
+    assert db.scalar(select(RoomUnavailability).where(RoomUnavailability.dataset_id == dataset.id)) is None
+    moved = {row["session_id"]: row for row in get_schedule_assignments(db, dataset.id, decision["approved_schedule_id"])["assignments"]}
+    assert (moved[assignment.session_source_id]["day"], moved[assignment.session_source_id]["start_period"], moved[assignment.session_source_id]["room_id"]) != (assignment.day, assignment.start_period, assignment.room_source_id)
+
+
+def test_class_move_creator_cannot_approve_and_request_changes_make_proposal_stale(db):
+    dataset, generated = seed_schedule(db)
+    requester = User(username="request-owner", password_hash="unused", role="department_coordinator", dataset_id=dataset.id, department="CSE")
+    admin = User(username="other-admin", password_hash="unused", role="admin")
+    db.add_all([requester, admin]); db.flush()
+    assignment, room, request = _make_class_move_booking(db, dataset, requester)
+    proposal = create_class_move_proposal(db, dataset_id=dataset.id, schedule_id=generated.schedule_id, request_source_id=request.source_id, room_source_id=room.source_id, day=assignment.day, start_period=assignment.start_period, created_by_user_id=requester.id, time_limit_seconds=10)
+    with pytest.raises(PermissionError, match="cannot approve their own"):
+        decide_class_move_proposal(db, dataset_id=dataset.id, proposal_id=proposal["proposal_id"], admin_id=requester.id, approve=True)
+    request.title = "Changed after proposal"
+    with pytest.raises(BookingApprovalError, match="changed after this proposal"):
+        decide_class_move_proposal(db, dataset_id=dataset.id, proposal_id=proposal["proposal_id"], admin_id=admin.id, approve=True)
+    db.rollback()
+    assert len(db.scalars(select(Schedule).where(Schedule.dataset_id == dataset.id)).all()) == 1
+
+
+def test_class_move_hard_constraint_change_prevents_schedule_or_booking_commit(db):
+    dataset, generated = seed_schedule(db)
+    requester = User(username="hard-requester", password_hash="unused", role="department_coordinator", dataset_id=dataset.id, department="CSE")
+    admin = User(username="hard-reviewer", password_hash="unused", role="admin")
+    db.add_all([requester, admin]); db.flush()
+    assignment, room, request = _make_class_move_booking(db, dataset, requester)
+    proposal = create_class_move_proposal(db, dataset_id=dataset.id, schedule_id=generated.schedule_id, request_source_id=request.source_id, room_source_id=room.source_id, day=assignment.day, start_period=assignment.start_period, created_by_user_id=requester.id, time_limit_seconds=10)
+    room.capacity -= 1
+    db.flush()
+    with pytest.raises(BookingApprovalError, match="changed after this proposal"):
+        decide_class_move_proposal(db, dataset_id=dataset.id, proposal_id=proposal["proposal_id"], admin_id=admin.id, approve=True)
+    db.flush()
+    assert len(db.scalars(select(Schedule).where(Schedule.dataset_id == dataset.id)).all()) == 1
+    assert db.scalar(select(BookingOutcome).where(BookingOutcome.dataset_id == dataset.id, BookingOutcome.request_source_id == request.source_id)) is None
+    assert db.get(BookingClassMoveProposal, proposal["proposal_id"]).status == "proposed"
+
+
+def test_admin_rejection_preserves_reason_and_actor(db):
+    dataset, generated = seed_schedule(db)
+    requester = User(username="reject-requester", password_hash="unused", role="department_coordinator", dataset_id=dataset.id, department="CSE")
+    admin = User(username="reject-admin", password_hash="unused", role="admin")
+    db.add_all([requester, admin]); db.flush()
+    assignment, room, request = _make_class_move_booking(db, dataset, requester)
+    proposal = create_class_move_proposal(db, dataset_id=dataset.id, schedule_id=generated.schedule_id, request_source_id=request.source_id, room_source_id=room.source_id, day=assignment.day, start_period=assignment.start_period, created_by_user_id=requester.id, time_limit_seconds=10)
+    result = decide_class_move_proposal(db, dataset_id=dataset.id, proposal_id=proposal["proposal_id"], admin_id=admin.id, approve=False, reject_reason="Room is reserved for another institute event")
+    assert result["status"] == "rejected"
+    assert result["reason"] == "Room is reserved for another institute event"
+    saved = db.get(BookingClassMoveProposal, proposal["proposal_id"])
+    assert saved.decided_by_user_id == admin.id and saved.decided_at is not None
+
+
+def _lab_booking_fixture(db, dataset, creator_name="lab-requester"):
+    creator = User(username=creator_name, password_hash="unused", role="department_coordinator", dataset_id=dataset.id, department="CSE")
+    coordinator = User(username="lab-reviewer", password_hash="unused", role="department_coordinator", dataset_id=dataset.id, department="CSE")
+    lab = Room(dataset_id=dataset.id, source_id="CSE-LAB-APPROVAL", name="CSE Lab", building="CSE", type="lab_cs", capacity=60, features=["computers"], accessible=True, allowed_uses=["lab", "event"], department="CSE")
+    db.add_all([creator, coordinator, lab]); db.flush()
+    request = BookingRequest(
+        dataset_id=dataset.id, source_id=f"LAB-{creator_name}", submitted_at=__import__("datetime").datetime.now(__import__("datetime").timezone.utc),
+        requester=creator.username, role="department_coordinator", department="CSE", requested_category="department_event",
+        title="Lab seminar", attendance=30, duration_periods=1,
+        windows=[{"day": "TUE", "from_period": 9, "to_period": 9}],
+        room_types=["lab_cs"], needs=[], requested_room=lab.source_id, mandatory_for_groups=[], raw_text="",
+        created_by_user_id=creator.id,
+    )
+    db.add(request); db.flush()
+    return coordinator, creator, lab, request
+
+
+def test_department_coordinator_can_approve_department_lab_booking_and_records_actor(db):
+    dataset, generated = seed_schedule(db)
+    coordinator, _creator, lab, request = _lab_booking_fixture(db, dataset)
+    result = decide_department_lab_booking(
+        db, dataset_id=dataset.id, schedule_id=generated.schedule_id,
+        request_source_id=request.source_id, coordinator_id=coordinator.id,
+        department="CSE", room_source_id=lab.source_id, day="TUE", start_period=9,
+    )
+    outcome = db.scalar(select(BookingOutcome).where(BookingOutcome.schedule_id == generated.schedule_id, BookingOutcome.request_source_id == request.source_id))
+    assert result["status"] == "approved"
+    assert outcome.decision_source == "department_lab"
+    assert outcome.decided_by_user_id == coordinator.id and outcome.decided_at is not None
+    assert outcome.room_source_id == lab.source_id
+
+
+def test_department_cannot_approve_another_department_or_own_lab_request(db):
+    dataset, generated = seed_schedule(db)
+    coordinator, creator, lab, request = _lab_booking_fixture(db, dataset, "lab-owner-1")
+    with pytest.raises(PermissionError, match="another department"):
+        decide_department_lab_booking(db, dataset_id=dataset.id, schedule_id=generated.schedule_id, request_source_id=request.source_id, coordinator_id=coordinator.id, department="EE", room_source_id=lab.source_id, day="TUE", start_period=9)
+    with pytest.raises(PermissionError, match="own booking"):
+        decide_department_lab_booking(db, dataset_id=dataset.id, schedule_id=generated.schedule_id, request_source_id=request.source_id, coordinator_id=creator.id, department="CSE", room_source_id=lab.source_id, day="TUE", start_period=9)
+
+
+def test_lab_approval_rejects_hard_constraint_failure_and_preserves_rejection_reason(db):
+    dataset, generated = seed_schedule(db)
+    coordinator, _creator, lab, request = _lab_booking_fixture(db, dataset, "lab-owner-2")
+    lab.capacity = 10
+    with pytest.raises(BookingApprovalError, match="capacity"):
+        decide_department_lab_booking(db, dataset_id=dataset.id, schedule_id=generated.schedule_id, request_source_id=request.source_id, coordinator_id=coordinator.id, department="CSE", room_source_id=lab.source_id, day="TUE", start_period=9)
+    db.rollback()
+    dataset = db.scalar(select(Dataset).where(Dataset.source_dataset_id == "repair-test"))
+    generated = db.scalar(select(Schedule).where(Schedule.dataset_id == dataset.id))
+    coordinator, _creator, lab, request = _lab_booking_fixture(db, dataset, "lab-owner-3")
+    result = decide_department_lab_booking(db, dataset_id=dataset.id, schedule_id=generated.id, request_source_id=request.source_id, coordinator_id=coordinator.id, department="CSE", room_source_id=None, day=None, start_period=None, reject_reason="Department event does not meet lab safety requirements")
+    outcome = db.scalar(select(BookingOutcome).where(BookingOutcome.schedule_id == generated.id, BookingOutcome.request_source_id == request.source_id))
+    assert result["status"] == "rejected"
+    assert outcome.reason == "Department event does not meet lab safety requirements"
+    assert outcome.decided_by_user_id == coordinator.id and outcome.decided_at is not None
+
+
 def test_natural_language_parser_hands_structured_disruption_to_repair_service(db):
     dataset, generated = seed_schedule(db)
     assignment = get_schedule_assignments(db, dataset.id, generated.schedule_id)["assignments"][0]
@@ -251,7 +410,12 @@ def test_natural_language_parser_hands_structured_disruption_to_repair_service(d
             "reason": "Campus event",
         }]
     }
+    test_admin = User(id=uuid4(), username="test-repair-admin", password_hash="unused", role="admin")
+    db.add(test_admin)
+    db.commit()
     app.dependency_overrides[get_db] = lambda: db
+    app.dependency_overrides[current_user] = lambda: test_admin
+    app.dependency_overrides[require_csrf] = lambda: None
     try:
         response = TestClient(app).post(
             f"/api/v1/datasets/{dataset.id}/schedules/{generated.schedule_id}/assistant/disruptions/repair-proposals",
@@ -259,6 +423,8 @@ def test_natural_language_parser_hands_structured_disruption_to_repair_service(d
         )
     finally:
         app.dependency_overrides.pop(get_db, None)
+        app.dependency_overrides.pop(current_user, None)
+        app.dependency_overrides.pop(require_csrf, None)
     assert response.status_code == 200, response.text
     body = response.json()
     assert body["status"] == "proposal_ready"

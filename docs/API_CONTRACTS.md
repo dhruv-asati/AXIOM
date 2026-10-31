@@ -2,7 +2,7 @@
 
 Base path: `/api/v1`; interactive Swagger documentation is served at `/docs` and OpenAPI JSON at `/openapi.json`.
 
-All dataset and schedule paths use database UUIDs. The backend verifies dataset ownership and scopes record reads and writes to the selected dataset. Errors use FastAPI's `{"detail": ...}` envelope. Database/schema availability failures return HTTP 503. No route provides authentication or authorization in this version.
+All dataset and schedule paths use database UUIDs. The backend verifies dataset ownership and scopes record reads and writes to the selected dataset. Errors use FastAPI's `{"detail": ...}` envelope. Database/schema availability failures return HTTP 503. `POST /api/v1/auth/login` is public and issues the HttpOnly session cookie; `GET /api/v1/auth/session` restores session and CSRF state; `POST /api/v1/auth/logout` revokes the session. `/api/v1/health` is public for hosting health checks. Other routes require an authenticated role and enforce role/dataset context. See [role access and demo account setup](ROLE_ACCESS.md).
 
 ## System
 
@@ -35,8 +35,15 @@ Infeasibility returns 422; solver timeout without a complete solution returns 50
 - `POST /datasets/{dataset_id}/booking-requests` — add a validated request to the selected dataset; duplicate source IDs return 409.
 - `POST /datasets/{dataset_id}/schedules/{schedule_id}/bookings/run` — deterministic booking decision run.
 - `GET /datasets/{dataset_id}/schedules/{schedule_id}/booking-outcomes` — persisted outcomes and pending requests.
+- `GET /datasets/{dataset_id}/schedules/{schedule_id}/department-lab-bookings` — department coordinator's pending lab-capable requests for explicitly department-assigned labs.
+- `POST /datasets/{dataset_id}/schedules/{schedule_id}/bookings/{request_source_id}/department-lab-decision` — coordinator approval or rejection; approval requires room, day and start period; rejection requires a reason.
+- `POST /datasets/{dataset_id}/bookings/{request_source_id}/class-move-proposals` — requester creates a solver-backed class move proposal with `schedule_id`, `room_id`, `day`, and `start_period`.
+- `GET /datasets/{dataset_id}/class-move-proposals` — Admin-only list with baseline and proposed assignments.
+- `POST /datasets/{dataset_id}/class-move-proposals/{proposal_id}/decision` — Admin-only `{"decision":"approve"}` or `{"decision":"reject","reason":"..."}`. Approval revalidates then creates a derived schedule and approved booking outcome; rejection records reason and actor.
+- `PUT /datasets/{dataset_id}/rooms/{room_source_id}/department` — Admin assigns or clears room department ownership. Department values must exist in this dataset.
 
 Booking decisions stay rule-based: the route does not call an LLM. Re-running updates outcomes rather than duplicating them.
+Human lab and class-move decisions are distinguished from engine outcomes and are preserved if the engine is run again. A request cannot have multiple approved booking outcomes across schedules.
 
 ## Assistant and disruptions
 

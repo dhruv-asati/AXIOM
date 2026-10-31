@@ -10,9 +10,9 @@ from sqlalchemy.orm import Session, configure_mappers
 
 from app.database.session import Base
 from app.models import (
-    BookingOutcome, BookingRequest, Course, Dataset, ExamRoomAllocation, Examination,
+    AuthSession, BookingClassMoveProposal, BookingOutcome, BookingRequest, Course, Dataset, ExamRoomAllocation, Examination,
     Faculty, Room, Schedule, ScheduleOverride, ScheduleSessionAssignment,
-    ScheduleRepairProposal, StudentGroup, TimetableSession,
+    ScheduleRepairProposal, StudentGroup, TimetableSession, User,
 )
 
 EXPECTED_TABLES = {
@@ -20,6 +20,8 @@ EXPECTED_TABLES = {
     "session_groups", "timetable_sessions", "booking_requests", "cancellations",
     "schedules", "schedule_session_assignments", "booking_outcomes", "examinations",
     "exam_room_allocations", "schedule_overrides", "schedule_repair_proposals",
+    "users", "auth_sessions",
+    "booking_class_move_proposals",
 }
 
 
@@ -69,6 +71,23 @@ class ModelMetadataTests(unittest.TestCase):
             table = Base.metadata.tables[table_name]
             for target, local in targets.items():
                 self.assertTrue(any(set(fk.column_keys) == local and {e.column.table.name for e in fk.elements} == {target} for fk in table.foreign_key_constraints), f"{table_name}->{target}")
+
+    def test_class_move_proposal_uses_dataset_scoped_foreign_keys(self):
+        table = Base.metadata.tables["booking_class_move_proposals"]
+        required = [
+            ("booking_requests", {"dataset_id", "request_source_id"}),
+            ("schedules", {"baseline_schedule_id", "dataset_id"}),
+            ("schedules", {"approved_schedule_id", "dataset_id"}),
+            ("schedule_repair_proposals", {"repair_proposal_id", "dataset_id"}),
+            ("rooms", {"dataset_id", "room_source_id"}),
+        ]
+        for target, local_columns in required:
+            self.assertTrue(any(
+                set(fk.column_keys) == local_columns
+                and {element.column.table.name for element in fk.elements} == {target}
+                for fk in table.foreign_key_constraints
+            ), f"booking_class_move_proposals->{target}{local_columns}")
+        assert BookingClassMoveProposal.__tablename__ == "booking_class_move_proposals"
 
     def test_relationship_sync_pairs_exclude_dataset_id(self):
         expected = [
@@ -147,7 +166,7 @@ class ModelMetadataTests(unittest.TestCase):
         tree = ast.parse(migration_files[0].read_text(encoding="utf-8"))
         creates = [n.args[0].value for n in ast.walk(tree) if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr == "create_table"]
         drops = [n.args[0].value for n in ast.walk(tree) if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr == "drop_table"]
-        initial_tables = EXPECTED_TABLES - {"schedule_repair_proposals"}
+        initial_tables = EXPECTED_TABLES - {"schedule_repair_proposals", "users", "auth_sessions", "booking_class_move_proposals"}
         self.assertEqual(initial_tables, set(creates))
         self.assertEqual(initial_tables, set(drops))
         repair_files = list((Path(__file__).parents[1] / "migrations" / "versions").glob("*_disruption_repair_proposals.py"))
@@ -155,6 +174,16 @@ class ModelMetadataTests(unittest.TestCase):
         repair_tree = ast.parse(repair_files[0].read_text(encoding="utf-8"))
         repair_creates = [n.args[0].value for n in ast.walk(repair_tree) if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr == "create_table"]
         self.assertEqual({"schedule_repair_proposals"}, set(repair_creates))
+        auth_files = list((Path(__file__).parents[1] / "migrations" / "versions").glob("*_role_authentication.py"))
+        self.assertEqual(1, len(auth_files))
+        auth_tree = ast.parse(auth_files[0].read_text(encoding="utf-8"))
+        auth_creates = [n.args[0].value for n in ast.walk(auth_tree) if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr == "create_table"]
+        self.assertEqual({"users", "auth_sessions"}, set(auth_creates))
+        approval_files = list((Path(__file__).parents[1] / "migrations" / "versions").glob("*_booking_approval_workflows.py"))
+        self.assertEqual(1, len(approval_files))
+        approval_tree = ast.parse(approval_files[0].read_text(encoding="utf-8"))
+        approval_creates = [n.args[0].value for n in ast.walk(approval_tree) if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr == "create_table"]
+        self.assertEqual({"booking_class_move_proposals"}, set(approval_creates))
 
 
 if __name__ == "__main__":

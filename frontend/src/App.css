@@ -95,6 +95,9 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 .profile-menu-heading span { color: #8d98a5; font-size: 10px; }
 .profile-menu > a { display: flex; align-items: center; gap: 9px; margin-top: 5px; padding: 10px; border-radius: 6px; color: #526175; font-size: 10.5px; }
 .profile-menu > a:hover { color: var(--accent-deep); background: #f6f7fb; }
+.profile-logout { display: flex; width: 100%; align-items: center; gap: 9px; margin-top: 3px; padding: 10px; border: 0; border-radius: 6px; color: #526175; background: transparent; font-size: 10.5px; text-align: left; cursor: pointer; }
+.profile-logout:hover { color: #b33d3d; background: #fff4f2; }
+.profile-logout-error { display: block; padding: 4px 10px 8px; color: #ad4541; font-size: 9px; line-height: 1.45; }
 .mobile-menu-button { display: none; }
 
 .main-content { min-height: calc(100vh - 70px); padding: 0 42px 0; }

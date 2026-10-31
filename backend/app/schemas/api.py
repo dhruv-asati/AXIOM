@@ -65,6 +65,7 @@ class RoomRecordResponse(BaseModel):
     name: str
     building: str
     room_type: str
+    department: str | None = None
     capacity: int
     features: list[str]
     accessible: bool
@@ -131,6 +132,7 @@ class BookingRequestRecordResponse(BaseModel):
     end_period: int | None
     room_id: str | None
     reason: str | None
+    created_by_user_id: UUID | None = None
 
 
 class DashboardSummaryResponse(BaseModel):

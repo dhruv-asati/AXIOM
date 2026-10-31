@@ -11,6 +11,7 @@ import type { TimetableSession } from '../types/timetable'
 import { mondayOfWeek, formatDate } from '../lib/timetableTime'
 import './Operations.css'
 import { SkeletonPage, SkeletonStats, SkeletonTable, SkeletonTimetable } from '../components/ui/Skeleton'
+import { useAuth } from '../auth/AuthContext'
 
 function toDisplaySession(row: TimetableAssignment, calendar: DatasetCalendar): TimetableSession {
   const start = calendar.periods.find((period) => period.id === row.start_period)?.start
@@ -25,7 +26,13 @@ function toDisplaySession(row: TimetableAssignment, calendar: DatasetCalendar): 
 }
 
 export function TimetablePage() {
+  const { user } = useAuth()
   const { selectedDatasetId } = useDatasetContext()
+  const timetableDescription = user?.role === 'faculty'
+    ? 'Your own weekly assignments and schedule-change requests, filtered to the signed-in faculty account.'
+    : user?.role === 'department_coordinator'
+      ? 'Your department timetable and schedule-change workspace.'
+      : 'Generate and inspect persisted CP-SAT schedules. Weekly assignments are a recurring pattern, not dated attendance.'
   const [calendar, setCalendar] = useState<DatasetCalendar | null>(null)
   const [schedules, setSchedules] = useState<ScheduleSummary[]>([])
   const [scheduleId, setScheduleId] = useState('')
@@ -121,7 +128,7 @@ export function TimetablePage() {
   const sessionsForCell = (day: string, period: number) => displaySessions.filter((session) => session.day === day && session.startPeriod === period)
 
   return <div className="ops-page">
-    <PageHeader eyebrow="ACADEMIC OPERATIONS" title="Timetable" description="Generate and inspect persisted CP-SAT schedules. Weekly assignments are a recurring pattern, not dated attendance." />
+    <PageHeader eyebrow="ACADEMIC OPERATIONS" title="Timetable" description={timetableDescription} />
     <section className="ops-toolbar">
       <label className="ops-field">Persisted schedule
         <select value={scheduleId} disabled={!schedules.length || loading} onChange={async (event) => {
@@ -137,10 +144,10 @@ export function TimetablePage() {
           {schedules.map((schedule) => <option key={schedule.schedule_id} value={schedule.schedule_id}>{new Date(schedule.created_at).toLocaleString()} · {schedule.status} · {schedule.assignment_count} sessions</option>)}
         </select>
       </label>
-      <label className="ops-check-row"><input type="checkbox" checked={useWarmStart} onChange={(event) => setUseWarmStart(event.target.checked)} />Use selected complete schedule as a warm start</label>
-      <button className="ops-button primary" type="button" disabled={!selectedDatasetId || generating} onClick={() => void runGeneration()}>
+      {user?.role === 'admin' && <label className="ops-check-row"><input type="checkbox" checked={useWarmStart} onChange={(event) => setUseWarmStart(event.target.checked)} />Use selected complete schedule as a warm start</label>}
+      {user?.role === 'admin' && <button className="ops-button primary" type="button" disabled={!selectedDatasetId || generating} onClick={() => void runGeneration()}>
         {generating ? <LoaderCircle size={14} className="is-spinning" /> : <Play size={14} />}{generating ? 'Solving…' : 'Generate timetable'}
-      </button>
+      </button>}
       <button className="ops-button" type="button" disabled={loading || !selectedDatasetId} onClick={() => void load(scheduleId, true)}>{loading ? <LoaderCircle size={14} className="is-spinning" /> : <RefreshCw size={14} />}Refresh</button>
     </section>
     {generationMessage && <div className="ops-message" role="status">{generationMessage}</div>}

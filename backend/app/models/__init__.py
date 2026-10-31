@@ -1,4 +1,6 @@
 from app.models.entities import (
+    AuthSession,
+    BookingClassMoveProposal,
     BookingOutcome,
     BookingRequest,
     Cancellation,
@@ -15,10 +17,11 @@ from app.models.entities import (
     ScheduleSessionAssignment,
     StudentGroup,
     TimetableSession,
+    User,
 )
 
 __all__ = [
-    "BookingOutcome", "BookingRequest", "Cancellation", "Course", "Dataset",
+    "AuthSession", "BookingClassMoveProposal", "BookingOutcome", "BookingRequest", "Cancellation", "Course", "Dataset",
     "ExamRoomAllocation", "Examination", "Faculty", "Room", "RoomUnavailability",
-    "Schedule", "ScheduleOverride", "ScheduleRepairProposal", "ScheduleSessionAssignment", "StudentGroup", "TimetableSession",
+    "Schedule", "ScheduleOverride", "ScheduleRepairProposal", "ScheduleSessionAssignment", "StudentGroup", "TimetableSession", "User",
 ]

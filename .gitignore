@@ -29,3 +29,5 @@ Thumbs.db
 # Runtime output and local databases
 *.log
 *.sqlite3
+demo-accounts*.local.json
+*.secrets.json

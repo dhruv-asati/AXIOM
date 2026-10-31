@@ -25,8 +25,8 @@ Vite prints the local URL (normally `http://localhost:5173`). The frontend reads
 - `npm run build` — run TypeScript project checks and create a production build in `dist/`.
 - `npm run preview` — serve the production build locally after building.
 
-There are currently no configured lint or test scripts.
+`npm test` runs the frontend's Node test suite for the API request cache. `npm run build` performs TypeScript project checks before creating the production bundle.
 
 ## Data and integrations
 
-The only implemented backend route is `GET /api/v1/health`. Operational pages show unavailable states until their backend/solver/AI contracts are implemented and documented in `../docs/API_CONTRACTS.md`. Timetable sample placements are development-only and visibly labelled; production builds do not load them. See `../docs/FRONTEND_DEMO_READINESS.md` for module status and a verified demo flow.
+The landing page and sign-in screen are public. The workspace restores its server session on refresh and displays navigation by authenticated role. API requests use same-origin cookies and attach the in-memory CSRF token on state-changing calls. Operational pages call the corresponding `/api/v1` routes and retain explicit empty/error states; see `../docs/API_CONTRACTS.md` for the service contracts.

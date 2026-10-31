@@ -47,6 +47,14 @@ def test_reimport_is_idempotent(db):
     assert count(db, RoomUnavailability) == 2
     assert count(db, session_groups) == first["counts"]["session_groups"]
 
+def test_reimport_without_source_room_department_preserves_admin_ownership(db):
+    import_dataset(db, DATA)
+    room = db.scalar(select(Room).where(Room.dataset_id == db.scalar(select(Dataset.id)), Room.source_id == "CS-LAB-1"))
+    room.department = "CSE"
+    db.commit()
+    import_dataset(db, DATA)
+    assert db.scalar(select(Room).where(Room.source_id == "CS-LAB-1")).department == "CSE"
+
 def test_malformed_data_rejected_before_write(db, tmp_path):
     payload = json.loads(DATA.read_text())
     payload["courses"][0].pop("title")

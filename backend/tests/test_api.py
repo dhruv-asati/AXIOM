@@ -9,11 +9,12 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 from app.api import routes
+from app.api.security import current_user, require_csrf
 from app.api.routes import get_db
 from app.database.session import Base
 from app.main import app
 from app.models import (
-    BookingOutcome, BookingRequest, Course, Dataset, ExamRoomAllocation, Examination, Faculty, Room, Schedule,
+    BookingOutcome, BookingRequest, Course, Dataset, ExamRoomAllocation, Examination, Faculty, Room, Schedule, User,
     ScheduleSessionAssignment, StudentGroup, TimetableSession,
 )
 from app.models.entities import session_groups
@@ -33,11 +34,18 @@ def api_client():
 
     Base.metadata.create_all(engine)
 
+    with Session(engine, expire_on_commit=False) as seed_db:
+        test_admin = User(id=uuid4(), username="test-admin", password_hash="unused", role="admin")
+        seed_db.add(test_admin)
+        seed_db.commit()
+
     def override_get_db():
         with Session(engine) as db:
             yield db
 
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[current_user] = lambda: test_admin
+    app.dependency_overrides[require_csrf] = lambda: None
     try:
         with TestClient(app) as client:
             yield client, engine

@@ -36,7 +36,7 @@ def _periods(start: int, end: int):
     return range(start, end + 1)
 
 
-def run_booking_engine(db: Session, dataset_id: UUID, schedule_id: UUID) -> dict[str, Any]:
+def run_booking_engine(db: Session, dataset_id: UUID, schedule_id: UUID, *, initiated_by_user_id: UUID | None = None) -> dict[str, Any]:
     """Make deterministic, transactional venue decisions against one schedule."""
     # API requests use a fresh session and get an owned transaction. This also
     # supports callers that already have a transaction by isolating the run in
@@ -92,9 +92,29 @@ def run_booking_engine(db: Session, dataset_id: UUID, schedule_id: UUID) -> dict
 
         cancellations = {c.request_source_id for c in db.scalars(select(Cancellation).where(Cancellation.dataset_id == dataset_id))}
         outcomes_by_request = {o.request_source_id: o for o in db.scalars(select(BookingOutcome).where(BookingOutcome.schedule_id == schedule_id, BookingOutcome.dataset_id == dataset_id))}
+        request_by_source = {request.source_id: request for request in requests}
+        for outcome in outcomes_by_request.values():
+            if outcome.decision_source not in {"department_lab", "class_move"} or outcome.status != "approved" or not outcome.day or outcome.start_period is None or outcome.end_period is None:
+                continue
+            for period in _periods(outcome.start_period, outcome.end_period):
+                if outcome.room_source_id:
+                    room_busy[(outcome.room_source_id, outcome.day, period)] = f"human-approved booking {outcome.request_source_id}"
+                approved_request = request_by_source.get(outcome.request_source_id)
+                for group_id in (approved_request.mandatory_for_groups or []) if approved_request else ():
+                    group_busy[(group_id, outcome.day, period)] = f"human-approved booking {outcome.request_source_id}"
         counts = {"approved": 0, "rejected": 0, "pending": 0}
+        decided_at = datetime.now(timezone.utc)
         for request in requests:
             outcome = outcomes_by_request.get(request.source_id)
+            if outcome is not None and outcome.decision_source in {"department_lab", "class_move"}:
+                if outcome.status in counts:
+                    counts[outcome.status] += 1
+                continue
+            if initiated_by_user_id is not None and request.created_by_user_id == initiated_by_user_id:
+                if outcome is not None and outcome.decided_by_user_id == initiated_by_user_id:
+                    db.delete(outcome)
+                counts["pending"] += 1
+                continue
             reason: str | None = None
             chosen: tuple[Room, str, int, int] | None = None
             if request.source_id in cancellations:
@@ -176,15 +196,18 @@ def run_booking_engine(db: Session, dataset_id: UUID, schedule_id: UUID) -> dict
                     if blockers:
                         reason += " Constraints checked: " + "; ".join(sorted(blockers)) + "."
             if outcome is None:
-                outcome = BookingOutcome(schedule_id=schedule_id, dataset_id=dataset_id, request_source_id=request.source_id, status=status, reason=reason)
+                outcome = BookingOutcome(schedule_id=schedule_id, dataset_id=dataset_id, request_source_id=request.source_id, status=status, reason=reason, decided_by_user_id=initiated_by_user_id)
                 db.add(outcome)
             else:
                 outcome.status = status
+                outcome.decided_by_user_id = initiated_by_user_id
                 outcome.reason = reason
                 outcome.day = None
                 outcome.start_period = None
                 outcome.end_period = None
                 outcome.room_source_id = None
+            outcome.decided_at = decided_at
+            outcome.decision_source = "engine"
             if chosen and status == "approved":
                 room, day, start, end = chosen
                 outcome.day, outcome.start_period, outcome.end_period, outcome.room_source_id = day, start, end, room.source_id

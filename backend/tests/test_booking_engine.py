@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session, configure_mappers
 
 from app.database.session import Base
 from app.models import (
-    BookingOutcome, BookingRequest, Cancellation, Course, Dataset, Faculty, Room,
+    BookingOutcome, BookingRequest, Cancellation, Course, Dataset, Faculty, Room, User,
     RoomUnavailability, Schedule, ScheduleSessionAssignment, StudentGroup,
     TimetableSession,
 )
@@ -84,7 +84,7 @@ def add_request(db, dataset, source, *, category="department_event", role="depar
 
 def test_imports_mapper_configuration_and_relationships():
     configure_mappers()
-    assert len(Base.metadata.tables) == 17
+    assert len(Base.metadata.tables) == 20
     assert "booking_outcomes" in Base.metadata.tables
     assert BookingOutcome.request.property.mapper.class_ is BookingRequest
     assert "/api/v1/datasets/{dataset_id}/schedules/{schedule_id}/bookings/run" in app.openapi()["paths"]
@@ -238,11 +238,24 @@ def test_outcomes_api_reports_requests_as_pending_until_run(db):
     dataset, schedule = add_dataset(db)
     add_request(db, dataset, "not-yet-decided")
     db.commit()
-    rows = get_booking_outcomes_endpoint(dataset.id, schedule.id, db)
+    user = User(id=uuid4(), username="outcomes-reader", password_hash="unused", role="admin")
+    rows = get_booking_outcomes_endpoint(dataset.id, schedule.id, db, user=user)
     assert rows == [{
         "request_id": "not-yet-decided", "status": "pending", "day": None,
         "start_period": None, "end_period": None, "room_id": None, "reason": None,
     }]
+
+
+def test_engine_does_not_decide_request_created_by_the_initiating_user(db):
+    dataset, schedule = add_dataset(db)
+    add_room(db, dataset)
+    actor = User(username="requesting-admin", password_hash="unused", role="admin")
+    db.add(actor); db.flush()
+    add_request(db, dataset, "self-request", created_by_user_id=actor.id)
+    db.commit()
+    result = run_booking_engine(db, dataset.id, schedule.id, initiated_by_user_id=actor.id)
+    assert result["counts"] == {"approved": 0, "rejected": 0, "pending": 1}
+    assert db.scalar(select(func.count()).select_from(BookingOutcome)) == 0
 
 
 def test_failed_run_rolls_back_all_outcomes(db):

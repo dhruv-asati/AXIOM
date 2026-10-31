@@ -1,7 +1,9 @@
 import { RequestCache } from './requestCache.mjs'
-
-const API_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:8000/api/v1').replace(/\/$/, '')
+import { API_BASE_URL } from './config'
 const responseCache = new RequestCache()
+let csrfToken = ''
+
+export function setCsrfToken(token: string): void { csrfToken = token }
 
 export class ApiError extends Error {
   status: number
@@ -25,11 +27,12 @@ export function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> 
 async function performRequest<T>(path: string, init: RequestInit): Promise<T> {
   let response: Response
   try {
-    response = await fetch(`${API_URL}${path}`, {
+    response = await fetch(`${API_BASE_URL}${path}`, {
       ...init,
+      credentials: 'include',
       headers: init.body instanceof FormData
-        ? init.headers
-        : { Accept: 'application/json', ...(init.body ? { 'Content-Type': 'application/json' } : {}), ...init.headers },
+        ? { ...(init.method && !['GET', 'HEAD'].includes(init.method.toUpperCase()) && csrfToken ? { 'X-CSRF-Token': csrfToken } : {}), ...init.headers }
+        : { Accept: 'application/json', ...(init.body ? { 'Content-Type': 'application/json' } : {}), ...(init.method && !['GET', 'HEAD'].includes(init.method.toUpperCase()) && csrfToken ? { 'X-CSRF-Token': csrfToken } : {}), ...init.headers },
     })
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') throw error
@@ -51,5 +54,5 @@ async function performRequest<T>(path: string, init: RequestInit): Promise<T> {
 }
 
 export function apiUrl(): string {
-  return API_URL
+  return API_BASE_URL
 }

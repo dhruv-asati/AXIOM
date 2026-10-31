@@ -14,7 +14,7 @@ COLLECTIONS = {
  "faculty": (Faculty, ("name","department","max_hours_per_day","needs_accessible","unavailable","preferences")),
  "courses": (Course, ("title","department","year","lecture_hours","tutorial_hours","lab_blocks")),
  "student_groups": (StudentGroup, ("name","year","department","size","needs_accessible")),
- "rooms": (Room, ("name","building","type","capacity","features","accessible","allowed_uses")),
+ "rooms": (Room, ("name","building","type","capacity","features","accessible","allowed_uses","department")),
  "booking_requests": (BookingRequest, ("submitted_at","requester","role","department","requested_category","title","attendance","duration_periods","windows","room_types","needs","requested_room","mandatory_for_groups","series_id","raw_text")),
  "exams": (Examination, ("course_ids","groups","size","duration_hours")),
 }
@@ -64,7 +64,8 @@ def validate(data):
    if not isinstance(r,dict) or not isinstance(r.get('id'),str) or not r['id'].strip(): raise DatasetImportError(f'{key}[{i}].id is required')
    if r['id'] in seen: raise DatasetImportError(f'{key}[{i}] duplicates source ID {r["id"]!r}')
    seen.add(r['id'])
-   missing=[x for x in fields if x not in r]
+   optional = {"department"} if key == "rooms" else set()
+   missing=[x for x in fields if x not in r and x not in optional]
    if missing: raise DatasetImportError(f'{key}[{i}] missing {missing}')
  for key,required in [('sessions',('id','course_id','faculty_id','kind','groups','size','duration','room_types','needs_accessible')),('room_unavailability',('room_id','day','periods','reason')),('cancellations',('request_id','cancelled_at','by','note'))]:
   for i,r in enumerate(data.get(key,[])):
@@ -101,7 +102,7 @@ def import_dataset(db:Session,source:str|Path):
   did=ds.id
   for key,(model,fields) in COLLECTIONS.items():
    for row in data.get(key,[]):
-    vals={f:row[f] for f in fields if f!='groups'}
+    vals={f:row.get(f) for f in fields if f!='groups' and (f != 'department' or f in row)}
     if key=='exams': vals['group_ids']=row['groups']
     if key=='booking_requests': vals['submitted_at']=datetime.fromisoformat(row['submitted_at'])
     _upsert(db,model,did,row['id'],vals); counts['examinations' if key=='exams' else key]+=1

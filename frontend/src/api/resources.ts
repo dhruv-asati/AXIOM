@@ -66,6 +66,75 @@ export function submitBooking(datasetId: string, data: Record<string, unknown>, 
   })
 }
 
+export function cancelBookingRequest(datasetId: string, requestId: string, reason: string) {
+  return apiRequest<void>(`/datasets/${datasetId}/bookings/${encodeURIComponent(requestId)}/cancel`, {
+    method: 'POST', body: JSON.stringify({ reason }),
+  })
+}
+
+export type DepartmentLabBooking = {
+  request_id: string; requester: string; title: string; department: string
+  attendance: number; duration_periods: number
+  windows: Array<{ day: string; from_period: number; to_period: number }>
+  room_types: string[]; needs: string[]; mandatory_for_groups: string[]
+  created_by_user_id: string | null; status: 'pending'
+}
+
+export type ClassMoveApproval = {
+  proposal_id: string; request_id: string; baseline_schedule_id: string
+  repair_proposal_id: string; room_id: string; day: string
+  start_period: number; end_period: number; status: 'proposed' | 'approved' | 'rejected'
+  reason: string | null; created_at: string; decided_at: string | null
+  created_by_user_id: string | null; decided_by_user_id: string | null
+  approved_schedule_id: string | null; changes: unknown[]
+  assignments: Array<{ session_id: string; day: string; start_period: number; room_id: string }>
+  changed_session_ids: string[]; explanation: string
+  before: Array<{ session_id: string; day: string; start_period: number; room_id: string }>
+  request: { title: string; requester: string; attendance: number } | null
+}
+
+export function listDepartmentLabBookings(datasetId: string, scheduleId: string, signal?: AbortSignal) {
+  return apiRequest<DepartmentLabBooking[]>(`/datasets/${datasetId}/schedules/${scheduleId}/department-lab-bookings`, { signal })
+}
+
+export function decideDepartmentLabBooking(datasetId: string, scheduleId: string, requestId: string, decision: 'approve' | 'reject', details: { room_id?: string; day?: string; start_period?: number; reason?: string }) {
+  return apiRequest<{ request_id: string; status: string; reason: string; decided_at: string }>(`/datasets/${datasetId}/schedules/${scheduleId}/bookings/${encodeURIComponent(requestId)}/department-lab-decision`, {
+    method: 'POST', body: JSON.stringify({ decision, ...details }),
+  })
+}
+
+export function createBookingClassMoveProposal(datasetId: string, requestId: string, details: { schedule_id: string; room_id: string; day: string; start_period: number }) {
+  return apiRequest<ClassMoveApproval>(`/datasets/${datasetId}/bookings/${encodeURIComponent(requestId)}/class-move-proposals`, {
+    method: 'POST', body: JSON.stringify({ ...details, time_limit_seconds: 60 }),
+  })
+}
+
+export function listClassMoveProposals(datasetId: string, signal?: AbortSignal) {
+  return apiRequest<ClassMoveApproval[]>(`/datasets/${datasetId}/class-move-proposals`, { signal })
+}
+
+export function decideClassMoveProposal(datasetId: string, proposalId: string, decision: 'approve' | 'reject', reason?: string) {
+  return apiRequest<{ proposal_id: string; status: string; reason: string; approved_schedule_id?: string }>(`/datasets/${datasetId}/class-move-proposals/${proposalId}/decision`, {
+    method: 'POST', body: JSON.stringify({ decision, reason }),
+  })
+}
+
+export function assignRoomDepartment(datasetId: string, roomId: string, department: string | null) {
+  return apiRequest<{ room_id: string; department: string | null }>(`/datasets/${datasetId}/rooms/${encodeURIComponent(roomId)}/department`, {
+    method: 'PUT', body: JSON.stringify({ department }),
+  })
+}
+
+export function updatePriorityOrder(datasetId: string, priorityOrder: string[]) {
+  return apiRequest<{ dataset_id: string; priority_order: string[] }>(`/datasets/${datasetId}/priority-order`, {
+    method: 'PUT', body: JSON.stringify({ priority_order: priorityOrder }),
+  })
+}
+
+export function resetDemoData(datasetId: string) {
+  return apiRequest<{ dataset_id: string; status: string; preserved: string[] }>(`/datasets/${datasetId}/demo-reset`, { method: 'POST' })
+}
+
 export function listRepairProposals(datasetId: string, signal?: AbortSignal) {
   return apiRequest<RepairProposal[]>(`/datasets/${datasetId}/repair-proposals`, { signal })
 }

@@ -1,24 +1,45 @@
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
-from collections.abc import Generator
 from tempfile import TemporaryDirectory
 from uuid import UUID
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, Response, UploadFile
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select, text
+from sqlalchemy import delete, func, select, text
 from sqlalchemy.orm import Session
 
-from app.database.session import SessionLocal
+from app.database.dependencies import get_db
+from app.core.config import settings
+from app.api.security import (
+    SESSION_COOKIE,
+    SESSION_TTL,
+    create_session,
+    current_user,
+    derive_csrf_token,
+    enforce_login_rate_limit,
+    public_user,
+    require_csrf,
+    require_dataset_scope,
+    require_roles,
+    verify_password,
+    verify_request_origin,
+)
 from app.models import (
-    BookingOutcome, BookingRequest, Cancellation, Course, Dataset,
+    AuthSession, BookingClassMoveProposal, BookingOutcome, BookingRequest, Cancellation, Course, Dataset,
     ExamRoomAllocation, Examination, Faculty, Room, RoomUnavailability,
     Schedule, ScheduleRepairProposal, ScheduleSessionAssignment, StudentGroup,
-    TimetableSession,
+    TimetableSession, User,
 )
 from app.models.entities import session_groups
 from app.services.bookings.engine import run_booking_engine
+from app.services.bookings.approval import (
+    BookingApprovalError,
+    class_move_payload,
+    create_class_move_proposal,
+    decide_class_move_proposal,
+    decide_department_lab_booking,
+)
 from app.services.datasets.importer import DatasetImportError, import_dataset, load_dataset, validate as validate_dataset
 from app.services.ai.disruption_parser import parse_disruption_request
 from app.services.ai.booking_parser import parse_booking_request
@@ -68,7 +89,8 @@ from app.schemas.api import (
     ScheduleSummaryResponse,
 )
 
-router = APIRouter()
+public_router = APIRouter()
+router = APIRouter(dependencies=[Depends(current_user), Depends(require_csrf), Depends(require_dataset_scope)])
 DATA_ROOT = (Path(__file__).resolve().parents[3] / "data").resolve()
 TEACHING_USES = {"lecture", "tutorial", "lab"}
 UTILISATION_DEFINITION = "Scheduled teaching period-hours divided by teaching period-hours available across rooms that allow teaching; periods marked unavailable are excluded."
@@ -167,17 +189,6 @@ def _room_utilisation(db: Session, dataset_id: UUID, schedule_id: UUID | None) -
     return round((used / available_periods) * 100, 1) if available_periods else None
 
 
-def get_db() -> Generator[Session, None, None]:
-    with SessionLocal() as db:
-        try:
-            yield db
-            if db.in_transaction():
-                db.commit()
-        except Exception:
-            db.rollback()
-            raise
-
-
 class DatasetImportRequest(BaseModel):
     path: str = Field(default="cit_public.json", description="A dataset JSON file or directory, relative to the repository data/ directory")
     replace_existing: bool = Field(default=False, description="Explicitly allow re-import to update a dataset with this source ID")
@@ -189,7 +200,124 @@ class TimetableGenerateRequest(BaseModel):
     warm_start_schedule_id: UUID | None = Field(default=None, description="Optional complete schedule in this dataset to seed CP-SAT search")
 
 
-@router.get("/health", tags=["system"], response_model=HealthResponse)
+class PriorityOrderRequest(BaseModel):
+    priority_order: list[str] = Field(min_length=1, max_length=32)
+
+
+class BookingCancellationRequest(BaseModel):
+    reason: str = Field(min_length=1, max_length=1000)
+
+
+class DepartmentLabDecisionRequest(BaseModel):
+    decision: str = Field(pattern="^(approve|reject)$")
+    room_id: str | None = Field(default=None, min_length=1, max_length=160)
+    day: str | None = Field(default=None, min_length=1, max_length=24)
+    start_period: int | None = Field(default=None, ge=1)
+    reason: str | None = Field(default=None, max_length=1000)
+
+
+class ClassMoveProposalCreate(BaseModel):
+    schedule_id: UUID
+    room_id: str = Field(min_length=1, max_length=160)
+    day: str = Field(min_length=1, max_length=24)
+    start_period: int = Field(ge=1)
+    time_limit_seconds: float = Field(default=60, ge=1, le=600)
+
+
+class ApprovalRejectRequest(BaseModel):
+    reason: str = Field(min_length=1, max_length=1000)
+
+
+class RoomDepartmentRequest(BaseModel):
+    department: str | None = Field(default=None, min_length=1, max_length=120)
+
+
+def _admin_only() -> list:
+    return [Depends(require_roles("admin"))]
+
+
+def _role_access(*roles: str) -> list:
+    return [Depends(require_roles(*roles))]
+
+
+def _assert_change_scope(db: Session, dataset_id: UUID, user: User, changes: list) -> None:
+    if user.role == "admin":
+        return
+    if user.role not in {"department_coordinator", "faculty"}:
+        raise HTTPException(status_code=403, detail="This role cannot request timetable changes")
+    for change in changes:
+        kind = getattr(change, "type", None)
+        faculty_id = getattr(change, "faculty_id", None)
+        if kind == "faculty_unavailable":
+            faculty = db.scalar(select(Faculty).where(Faculty.dataset_id == dataset_id, Faculty.source_id == faculty_id))
+            if faculty is None or (user.role == "faculty" and faculty_id != user.faculty_source_id) or (user.role == "department_coordinator" and faculty.department != user.department):
+                raise HTTPException(status_code=403, detail="You cannot change availability for this faculty member")
+        elif kind == "remove_session":
+            session = db.scalar(select(TimetableSession).where(
+                TimetableSession.dataset_id == dataset_id,
+                TimetableSession.source_id == getattr(change, "session_id", None),
+            ))
+            course = db.scalar(select(Course).where(
+                Course.dataset_id == dataset_id,
+                Course.source_id == session.course_source_id if session else "",
+            )) if session else None
+            if session is None or (user.role == "faculty" and session.faculty_source_id != user.faculty_source_id) or (user.role == "department_coordinator" and (course is None or course.department != user.department)):
+                raise HTTPException(status_code=403, detail="You cannot request a change to this session")
+        elif kind == "add_session":
+            new_session = getattr(change, "session", None)
+            if new_session is None or (user.role == "faculty" and new_session.faculty_id != user.faculty_source_id):
+                raise HTTPException(status_code=403, detail="You cannot request this additional session")
+            faculty = db.scalar(select(Faculty).where(Faculty.dataset_id == dataset_id, Faculty.source_id == new_session.faculty_id))
+            course = db.scalar(select(Course).where(Course.dataset_id == dataset_id, Course.source_id == new_session.course_id))
+            if faculty is None or course is None or (user.role == "department_coordinator" and (faculty.department != user.department or course.department != user.department)):
+                raise HTTPException(status_code=403, detail="Additional sessions must belong to your faculty member or department")
+        else:
+            raise HTTPException(status_code=403, detail="This role cannot request that type of timetable change")
+
+
+class LoginRequest(BaseModel):
+    username: str = Field(min_length=1, max_length=120)
+    password: str = Field(min_length=1, max_length=1024)
+
+
+@public_router.post("/auth/login", tags=["authentication"])
+def login(body: LoginRequest, request: Request, response: Response, db: Session = Depends(get_db)):
+    verify_request_origin(request)
+    enforce_login_rate_limit(request)
+    normalized_username = body.username.strip().casefold()
+    user = db.scalar(select(User).where(func.lower(User.username) == normalized_username))
+    valid = user is not None and user.is_active and verify_password(body.password, user.password_hash)
+    if not valid:
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+    token, csrf_token, _session = create_session(db, user)
+    response.set_cookie(
+        SESSION_COOKIE,
+        token,
+        max_age=int(SESSION_TTL.total_seconds()),
+        httponly=True,
+        secure=settings.environment.lower() == "production",
+        samesite="strict",
+        path="/",
+    )
+    return {"user": public_user(user), "csrf_token": csrf_token}
+
+
+@router.get("/auth/session", tags=["authentication"])
+def get_auth_session(request: Request, user: User = Depends(current_user)):
+    token = request.cookies.get(SESSION_COOKIE, "")
+    return {"user": public_user(user), "csrf_token": derive_csrf_token(token)}
+
+
+@router.post("/auth/logout", tags=["authentication"], status_code=204)
+def logout(request: Request, response: Response, db: Session = Depends(get_db), _user: User = Depends(current_user)):
+    session = request.state.auth_session
+    session.revoked_at = datetime.now(timezone.utc)
+    response.delete_cookie(SESSION_COOKIE, path="/", httponly=True, secure=settings.environment.lower() == "production", samesite="strict")
+    response.status_code = 204
+    return response
+
+
+@public_router.get("/health", tags=["system"], response_model=HealthResponse)
 def health_check() -> dict[str, str]:
     return {"status": "ok", "service": "axiom-api"}
 
@@ -204,6 +332,7 @@ def readiness_check(db: Session = Depends(get_db)):
     "/datasets/import",
     tags=["datasets"],
     response_model=DatasetImportResponse,
+    dependencies=_admin_only(),
     responses={400: {"model": ErrorResponse}, 404: {"model": ErrorResponse}, 422: {"model": ErrorResponse}},
 )
 def import_dataset_endpoint(body: DatasetImportRequest, db: Session = Depends(get_db)):
@@ -233,6 +362,7 @@ def import_dataset_endpoint(body: DatasetImportRequest, db: Session = Depends(ge
     "/datasets/import/upload",
     tags=["datasets"],
     response_model=DatasetImportResponse,
+    dependencies=_admin_only(),
     responses={400: {"model": ErrorResponse}, 409: {"model": ErrorResponse}, 422: {"model": ErrorResponse}},
 )
 def upload_dataset_endpoint(
@@ -287,8 +417,11 @@ def upload_dataset_endpoint(
 
 
 @router.get("/datasets", tags=["datasets"], response_model=list[DatasetSummaryResponse])
-def list_datasets(db: Session = Depends(get_db)):
-    rows = db.scalars(select(Dataset).order_by(Dataset.source_dataset_id)).all()
+def list_datasets(db: Session = Depends(get_db), user: User = Depends(current_user)):
+    statement = select(Dataset).order_by(Dataset.source_dataset_id)
+    if user.role != "admin":
+        statement = statement.where(Dataset.id == user.dataset_id)
+    rows = db.scalars(statement).all()
     return [{"id": str(row.id), "source_dataset_id": row.source_dataset_id, "institute": row.institute, "created_at": row.created_at} for row in rows]
 
 
@@ -300,8 +433,57 @@ def get_dataset(dataset_id: UUID, db: Session = Depends(get_db)):
     return {"id": str(row.id), "source_dataset_id": row.source_dataset_id, "institute": row.institute, "calendar": row.calendar, "priority_order": row.priority_order, "role_category_cap": row.role_category_cap}
 
 
-@router.get("/datasets/{dataset_id}/summary", tags=["datasets"], response_model=DashboardSummaryResponse)
-def get_dataset_dashboard_summary(dataset_id: UUID, db: Session = Depends(get_db)):
+@router.put("/datasets/{dataset_id}/priority-order", tags=["datasets"], dependencies=_admin_only())
+def update_priority_order(dataset_id: UUID, body: PriorityOrderRequest, db: Session = Depends(get_db)):
+    dataset = db.scalar(select(Dataset).where(Dataset.id == dataset_id).with_for_update())
+    if dataset is None:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+    current = list(dataset.priority_order or [])
+    if len(body.priority_order) != len(set(body.priority_order)) or set(body.priority_order) != set(current):
+        raise HTTPException(status_code=422, detail="Priority order must contain every existing category exactly once")
+    dataset.priority_order = body.priority_order
+    return {"dataset_id": str(dataset.id), "priority_order": dataset.priority_order}
+
+
+@router.post("/datasets/{dataset_id}/demo-reset", tags=["administration"], dependencies=_admin_only())
+def reset_demo_data(dataset_id: UUID, db: Session = Depends(get_db)):
+    if db.get(Dataset, dataset_id) is None:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+    demo_schedule_ids = select(Schedule.id).where(
+        Schedule.dataset_id == dataset_id,
+        Schedule.created_by_user_id.is_not(None),
+    )
+    # Proposal records that point at demo schedules are transient solver output;
+    # source dataset records and imported booking requests remain untouched.
+    db.execute(delete(ScheduleRepairProposal).where(
+        ScheduleRepairProposal.dataset_id == dataset_id,
+        (ScheduleRepairProposal.created_by_user_id.is_not(None)
+         | ScheduleRepairProposal.baseline_schedule_id.in_(demo_schedule_ids)
+         | ScheduleRepairProposal.approved_schedule_id.in_(demo_schedule_ids)),
+    ))
+    db.execute(delete(Cancellation).where(
+        Cancellation.dataset_id == dataset_id,
+        Cancellation.cancelled_by_user_id.is_not(None),
+    ))
+    db.execute(delete(BookingRequest).where(
+        BookingRequest.dataset_id == dataset_id,
+        BookingRequest.created_by_user_id.is_not(None),
+    ))
+    db.execute(delete(BookingOutcome).where(
+        BookingOutcome.dataset_id == dataset_id,
+        BookingOutcome.decided_by_user_id.is_not(None),
+    ))
+    db.execute(delete(Schedule).where(
+        Schedule.dataset_id == dataset_id,
+        Schedule.created_by_user_id.is_not(None),
+    ))
+    return {"dataset_id": str(dataset_id), "status": "reset", "preserved": ["imported dataset records", "imported booking requests", "legacy schedules"]}
+
+
+@router.get("/datasets/{dataset_id}/summary", tags=["datasets"], response_model=DashboardSummaryResponse, dependencies=_role_access("admin"))
+def get_dataset_dashboard_summary(dataset_id: UUID, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="Aggregate dataset metrics are not available for this role")
     dataset = db.get(Dataset, dataset_id)
     if dataset is None:
         raise HTTPException(status_code=404, detail="Dataset not found")
@@ -442,17 +624,17 @@ def _list_schedules(db: Session, dataset_id: UUID) -> list[dict]:
     return summaries
 
 
-@router.get("/datasets/{dataset_id}/schedules", tags=["timetables"], response_model=list[ScheduleSummaryResponse])
+@router.get("/datasets/{dataset_id}/schedules", tags=["timetables"], response_model=list[ScheduleSummaryResponse], dependencies=_role_access("admin", "department_coordinator", "faculty", "club_representative"))
 def list_schedules_endpoint(dataset_id: UUID, db: Session = Depends(get_db)):
     return _list_schedules(db, dataset_id)
 
 
-@router.get("/datasets/{dataset_id}/schedule-history", tags=["timetables"], response_model=list[ScheduleSummaryResponse])
+@router.get("/datasets/{dataset_id}/schedule-history", tags=["timetables"], response_model=list[ScheduleSummaryResponse], dependencies=_role_access("admin"))
 def list_schedule_history_endpoint(dataset_id: UUID, db: Session = Depends(get_db)):
     return _list_schedules(db, dataset_id)
 
 
-@router.get("/datasets/{dataset_id}/schedules/{schedule_id}", tags=["timetables"], response_model=ScheduleDetailResponse)
+@router.get("/datasets/{dataset_id}/schedules/{schedule_id}", tags=["timetables"], response_model=ScheduleDetailResponse, dependencies=_role_access("admin", "department_coordinator", "faculty"))
 def get_schedule_detail_endpoint(dataset_id: UUID, schedule_id: UUID, db: Session = Depends(get_db)):
     schedule = db.scalar(select(Schedule).where(Schedule.id == schedule_id, Schedule.dataset_id == dataset_id))
     if schedule is None:
@@ -471,7 +653,10 @@ def list_rooms_endpoint(
     period: int | None = Query(default=None, ge=1),
     available_only: bool = False,
     db: Session = Depends(get_db),
+    user: User = Depends(current_user),
 ):
+    if user.role not in {"admin", "department_coordinator", "club_representative"}:
+        raise HTTPException(status_code=403, detail="Room inventory is unavailable for this role")
     dataset = db.get(Dataset, dataset_id)
     if dataset is None:
         raise HTTPException(status_code=404, detail="Dataset not found")
@@ -533,7 +718,7 @@ def list_rooms_endpoint(
         used = scheduled_periods.get(room.source_id, 0)
         result.append({
             "room_id": room.source_id, "name": room.name, "building": room.building,
-            "room_type": room.type, "capacity": room.capacity, "features": room.features or [],
+            "room_type": room.type, "department": room.department, "capacity": room.capacity, "features": room.features or [],
             "accessible": room.accessible, "allowed_uses": room.allowed_uses or [],
             "availability": availability, "scheduled_periods": used,
             "unavailable_periods": len(room_unavailable),
@@ -542,8 +727,25 @@ def list_rooms_endpoint(
     return result
 
 
-@router.get("/datasets/{dataset_id}/schedules/{schedule_id}/examinations", tags=["examinations"], response_model=ExaminationsResponse)
-def get_examinations_endpoint(dataset_id: UUID, schedule_id: UUID, db: Session = Depends(get_db)):
+@router.put("/datasets/{dataset_id}/rooms/{room_source_id}/department", tags=["venues"], dependencies=_admin_only())
+def assign_room_department_endpoint(
+    dataset_id: UUID, room_source_id: str, body: RoomDepartmentRequest,
+    db: Session = Depends(get_db),
+):
+    room = db.scalar(select(Room).where(Room.dataset_id == dataset_id, Room.source_id == room_source_id).with_for_update())
+    if room is None:
+        raise HTTPException(status_code=404, detail="Room not found for dataset")
+    department = body.department.strip() if body.department else None
+    if department and not any(db.scalar(select(model.id).where(model.dataset_id == dataset_id, model.department == department)) is not None for model in (Faculty, Course, StudentGroup)):
+        raise HTTPException(status_code=422, detail="Department must exist in the selected dataset")
+    room.department = department
+    return {"room_id": room.source_id, "department": room.department}
+
+
+@router.get("/datasets/{dataset_id}/schedules/{schedule_id}/examinations", tags=["examinations"], response_model=ExaminationsResponse, dependencies=_role_access("admin", "department_coordinator"))
+def get_examinations_endpoint(dataset_id: UUID, schedule_id: UUID, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    if user.role not in {"admin", "department_coordinator"}:
+        raise HTTPException(status_code=403, detail="Examination records are unavailable for this role")
     if db.scalar(select(Schedule.id).where(Schedule.id == schedule_id, Schedule.dataset_id == dataset_id)) is None:
         raise HTTPException(status_code=404, detail="Schedule not found for dataset")
     exams = db.scalars(select(Examination).where(Examination.dataset_id == dataset_id).order_by(Examination.source_id)).all()
@@ -559,6 +761,10 @@ def get_examinations_endpoint(dataset_id: UUID, schedule_id: UUID, db: Session =
     ).all()
     courses = {row.source_id: row for row in db.scalars(select(Course).where(Course.dataset_id == dataset_id))}
     groups = {row.source_id: row for row in db.scalars(select(StudentGroup).where(StudentGroup.dataset_id == dataset_id))}
+    if user.role == "department_coordinator":
+        department_course_ids = {source_id for source_id, course in courses.items() if course.department == user.department}
+        department_group_ids = {source_id for source_id, group in groups.items() if group.department == user.department}
+        exams = [exam for exam in exams if department_course_ids.intersection(exam.course_ids or [])]
     by_exam: dict[str, list[tuple[ExamRoomAllocation, Room]]] = {}
     for allocation, room in allocation_rows:
         by_exam.setdefault(allocation.examination_source_id, []).append((allocation, room))
@@ -575,13 +781,16 @@ def get_examinations_endpoint(dataset_id: UUID, schedule_id: UUID, db: Session =
             })
         course_ids = list(exam.course_ids or [])
         group_ids = list(exam.group_ids or [])
+        if user.role == "department_coordinator":
+            course_ids = [source_id for source_id in course_ids if source_id in department_course_ids]
+            group_ids = [source_id for source_id in group_ids if source_id in department_group_ids]
         items.append({
             "exam_id": exam.source_id,
             "course_ids": course_ids,
             "course_names": [courses[cid].title if cid in courses else cid for cid in course_ids],
             "group_ids": group_ids,
             "group_names": [groups[gid].name if gid in groups else gid for gid in group_ids],
-            "expected_attendance": exam.size,
+            "expected_attendance": sum(groups[group_id].size for group_id in group_ids if group_id in groups) if user.role == "department_coordinator" else exam.size,
             "day": day,
             "session": exam_session,
             "rooms": allocated_rooms,
@@ -591,7 +800,7 @@ def get_examinations_endpoint(dataset_id: UUID, schedule_id: UUID, db: Session =
 
 
 @router.get("/datasets/{dataset_id}/bookings", tags=["bookings"], response_model=list[BookingRequestRecordResponse])
-def list_booking_requests_endpoint(dataset_id: UUID, schedule_id: UUID | None = None, db: Session = Depends(get_db)):
+def list_booking_requests_endpoint(dataset_id: UUID, schedule_id: UUID | None = None, db: Session = Depends(get_db), user: User = Depends(current_user)):
     dataset = db.get(Dataset, dataset_id)
     if dataset is None:
         raise HTTPException(status_code=404, detail="Dataset not found")
@@ -599,7 +808,12 @@ def list_booking_requests_endpoint(dataset_id: UUID, schedule_id: UUID | None = 
         raise HTTPException(status_code=404, detail="Schedule not found for dataset")
     order = list(dataset.priority_order or [])
     caps = dataset.role_category_cap or {}
-    requests = db.scalars(select(BookingRequest).where(BookingRequest.dataset_id == dataset_id).order_by(BookingRequest.submitted_at, BookingRequest.source_id)).all()
+    statement = select(BookingRequest).where(BookingRequest.dataset_id == dataset_id)
+    if user.role in {"club_representative", "faculty"}:
+        statement = statement.where(BookingRequest.created_by_user_id == user.id)
+    elif user.role == "department_coordinator":
+        statement = statement.where(BookingRequest.department == user.department)
+    requests = db.scalars(statement.order_by(BookingRequest.submitted_at, BookingRequest.source_id)).all()
     cancellations = set(db.scalars(select(Cancellation.request_source_id).where(Cancellation.dataset_id == dataset_id)).all())
     outcomes = db.scalars(select(BookingOutcome).where(
         BookingOutcome.dataset_id == dataset_id,
@@ -627,18 +841,23 @@ def list_booking_requests_endpoint(dataset_id: UUID, schedule_id: UUID | None = 
             "day": outcome.day if outcome else None, "start_period": outcome.start_period if outcome else None,
             "end_period": outcome.end_period if outcome else None,
             "room_id": outcome.room_source_id if outcome else None, "reason": outcome.reason if outcome else None,
+            "created_by_user_id": request.created_by_user_id,
         })
     return items
 
 
-@router.post("/assistant/bookings/parse", tags=["assistant"], response_model=AssistantResponse)
-def parse_booking_endpoint(body: AssistantRequest):
+@router.post("/assistant/bookings/parse", tags=["assistant"], response_model=AssistantResponse, dependencies=_role_access("admin", "department_coordinator", "club_representative"))
+def parse_booking_endpoint(body: AssistantRequest, user: User = Depends(current_user)):
     """Parse a booking request into a review-only structured proposal."""
+    if user.role not in {"admin", "department_coordinator", "club_representative"}:
+        raise HTTPException(status_code=403, detail="This role cannot request a venue booking")
     return parse_booking_request(body)
 
 
-@router.post("/datasets/{dataset_id}/booking-requests", tags=["bookings"], response_model=BookingRequestRecordResponse, status_code=201)
-def create_booking_request_endpoint(dataset_id: UUID, body: BookingRequestCreate, db: Session = Depends(get_db)):
+@router.post("/datasets/{dataset_id}/booking-requests", tags=["bookings"], response_model=BookingRequestRecordResponse, status_code=201, dependencies=_role_access("admin", "department_coordinator", "club_representative"))
+def create_booking_request_endpoint(dataset_id: UUID, body: BookingRequestCreate, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    if user.role not in {"admin", "department_coordinator", "club_representative"}:
+        raise HTTPException(status_code=403, detail="This role cannot request a venue booking")
     with db.begin_nested() if db.in_transaction() else db.begin():
         dataset = db.scalar(select(Dataset).where(Dataset.id == dataset_id).with_for_update())
         if dataset is None:
@@ -650,20 +869,33 @@ def create_booking_request_endpoint(dataset_id: UUID, body: BookingRequestCreate
         if duplicate is not None:
             raise HTTPException(status_code=409, detail=f"Booking request source ID {source_id!r} already exists")
         data = body.data
+        category = data.requested_category or dataset.priority_order[-1]
+        if user.role == "club_representative":
+            if category != "club_event":
+                raise HTTPException(status_code=403, detail="Club representatives may submit club event requests only")
+        elif user.role == "department_coordinator":
+            if category != "department_event":
+                raise HTTPException(status_code=403, detail="Department coordinators may submit department event requests only")
+        elif category not in (dataset.priority_order or []):
+            raise HTTPException(status_code=422, detail="requested_category must match a category in this dataset")
         request = BookingRequest(
             dataset_id=dataset_id, source_id=source_id, submitted_at=datetime.now(timezone.utc),
-            requester=data.requester, role=data.role, department=data.department,
-            requested_category=data.requested_category or dataset.priority_order[-1], title=data.title,
+            requester=user.username,
+            role="club" if user.role == "club_representative" else user.role,
+            department=user.department,
+            requested_category=category, title=data.title,
             attendance=data.attendance, duration_periods=data.duration_periods,
             windows=[window.model_dump(mode="json") for window in data.windows],
             room_types=data.room_types, needs=data.needs, requested_room=data.requested_room,
             mandatory_for_groups=data.mandatory_for_groups, series_id=data.series_id,
+            created_by_user_id=user.id,
+            club_id=user.club_id if user.role == "club_representative" else None,
             raw_text=body.raw_text,
         )
         db.add(request)
         db.flush()
         order = list(dataset.priority_order or [])
-        cap_index = order.index(dataset.role_category_cap[data.role]) if dataset.role_category_cap.get(data.role) in order else len(order) - 1
+        cap_index = order.index(dataset.role_category_cap[request.role]) if dataset.role_category_cap.get(request.role) in order else len(order) - 1
         index = max(order.index(request.requested_category), cap_index)
         return {
             "request_id": request.source_id, "submitted_at": request.submitted_at,
@@ -674,19 +906,202 @@ def create_booking_request_endpoint(dataset_id: UUID, body: BookingRequestCreate
             "requested_room": request.requested_room, "mandatory_for_groups": request.mandatory_for_groups,
             "cancelled": False, "status": "pending", "day": None, "start_period": None,
             "end_period": None, "room_id": None, "reason": None,
+            "created_by_user_id": request.created_by_user_id,
         }
+
+
+@router.post("/datasets/{dataset_id}/bookings/{request_source_id}/cancel", tags=["bookings"], status_code=204, dependencies=_role_access("admin", "club_representative", "department_coordinator"))
+def cancel_booking_request(
+    dataset_id: UUID,
+    request_source_id: str,
+    body: BookingCancellationRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(current_user),
+):
+    request = db.scalar(select(BookingRequest).where(
+        BookingRequest.dataset_id == dataset_id,
+        BookingRequest.source_id == request_source_id,
+    ).with_for_update())
+    if request is None:
+        raise HTTPException(status_code=404, detail="Booking request not found")
+    if user.role != "admin" and request.created_by_user_id != user.id:
+        raise HTTPException(status_code=403, detail="You can cancel only your own booking requests")
+    if db.scalar(select(BookingOutcome.id).where(
+        BookingOutcome.dataset_id == dataset_id,
+        BookingOutcome.request_source_id == request_source_id,
+        BookingOutcome.status == "approved",
+    )) is not None:
+        raise HTTPException(status_code=409, detail="An approved booking cannot be cancelled through this endpoint")
+    if db.scalar(select(Cancellation.id).where(
+        Cancellation.dataset_id == dataset_id,
+        Cancellation.request_source_id == request_source_id,
+    )) is not None:
+        raise HTTPException(status_code=409, detail="Booking request is already cancelled")
+    db.add(Cancellation(
+        dataset_id=dataset_id,
+        request_source_id=request_source_id,
+        cancelled_at=datetime.now(timezone.utc),
+        by=user.username,
+        note=body.reason,
+        cancelled_by_user_id=user.id,
+    ))
+    return Response(status_code=204)
+
+
+@router.get(
+    "/datasets/{dataset_id}/schedules/{schedule_id}/department-lab-bookings",
+    tags=["bookings"],
+    dependencies=_role_access("department_coordinator"),
+)
+def list_department_lab_bookings(dataset_id: UUID, schedule_id: UUID, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    """Pending lab-capable booking requests submitted for the coordinator's department."""
+    if db.scalar(select(Schedule.id).where(Schedule.id == schedule_id, Schedule.dataset_id == dataset_id)) is None:
+        raise HTTPException(status_code=404, detail="Schedule not found for dataset")
+    requests = db.scalars(select(BookingRequest).where(
+        BookingRequest.dataset_id == dataset_id,
+        BookingRequest.department == user.department,
+    ).order_by(BookingRequest.submitted_at, BookingRequest.source_id)).all()
+    cancelled = set(db.scalars(select(Cancellation.request_source_id).where(Cancellation.dataset_id == dataset_id)).all())
+    department_labs = db.scalars(select(Room).where(
+        Room.dataset_id == dataset_id,
+        Room.department == user.department,
+    )).all()
+    eligible_lab_types = {
+        row.type.casefold() for row in department_labs
+        if "lab" in row.type.casefold() and "event" in (row.allowed_uses or [])
+    }
+    decided = set(db.scalars(select(BookingOutcome.request_source_id).where(
+        BookingOutcome.dataset_id == dataset_id, BookingOutcome.schedule_id == schedule_id,
+    )).all())
+    approved_anywhere = set(db.scalars(select(BookingOutcome.request_source_id).where(
+        BookingOutcome.dataset_id == dataset_id, BookingOutcome.status == "approved",
+    )).all())
+    return [{
+        "request_id": row.source_id,
+        "requester": row.requester,
+        "title": row.title,
+        "department": row.department,
+        "attendance": row.attendance,
+        "duration_periods": row.duration_periods,
+        "windows": row.windows,
+        "room_types": row.room_types,
+        "needs": row.needs,
+        "mandatory_for_groups": row.mandatory_for_groups,
+        "created_by_user_id": row.created_by_user_id,
+        "status": "pending",
+    } for row in requests if row.source_id not in cancelled and row.source_id not in decided and row.source_id not in approved_anywhere and eligible_lab_types.intersection(str(kind).casefold() for kind in (row.room_types or []))]
+
+
+@router.post(
+    "/datasets/{dataset_id}/schedules/{schedule_id}/bookings/{request_source_id}/department-lab-decision",
+    tags=["bookings"], dependencies=_role_access("department_coordinator"),
+)
+def decide_department_lab_booking_endpoint(
+    dataset_id: UUID, schedule_id: UUID, request_source_id: str,
+    body: DepartmentLabDecisionRequest, db: Session = Depends(get_db), user: User = Depends(current_user),
+):
+    try:
+        return decide_department_lab_booking(
+            db, dataset_id=dataset_id, schedule_id=schedule_id,
+            request_source_id=request_source_id, coordinator_id=user.id,
+            department=user.department or "", room_source_id=body.room_id,
+            day=body.day, start_period=body.start_period,
+            reject_reason=body.reason.strip() if body.decision == "reject" and body.reason else ("A reason is required." if body.decision == "reject" else None),
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except BookingApprovalError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.post(
+    "/datasets/{dataset_id}/bookings/{request_source_id}/class-move-proposals",
+    tags=["bookings"], dependencies=_role_access("admin", "department_coordinator", "club_representative"),
+)
+def create_booking_class_move_proposal_endpoint(
+    dataset_id: UUID, request_source_id: str, body: ClassMoveProposalCreate,
+    db: Session = Depends(get_db), user: User = Depends(current_user),
+):
+    try:
+        return create_class_move_proposal(
+            db, dataset_id=dataset_id, schedule_id=body.schedule_id,
+            request_source_id=request_source_id, room_source_id=body.room_id,
+            day=body.day, start_period=body.start_period, created_by_user_id=user.id,
+            time_limit_seconds=body.time_limit_seconds,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except BookingApprovalError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except RepairInfeasibleError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except RepairTimeoutError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except RepairError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.get("/datasets/{dataset_id}/class-move-proposals", tags=["bookings"], dependencies=_role_access("admin", "department_coordinator", "club_representative"))
+def list_booking_class_move_proposals(dataset_id: UUID, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    statement = select(BookingClassMoveProposal).where(BookingClassMoveProposal.dataset_id == dataset_id)
+    if user.role != "admin":
+        statement = statement.where(BookingClassMoveProposal.created_by_user_id == user.id)
+    proposals = db.scalars(statement.order_by(BookingClassMoveProposal.created_at.desc(), BookingClassMoveProposal.id)).all()
+    results = []
+    for proposal in proposals:
+        repair = db.get(ScheduleRepairProposal, proposal.repair_proposal_id)
+        if repair is None:
+            continue
+        result = class_move_payload(proposal, repair)
+        result["before"] = [{
+            "session_id": row.session_source_id, "day": row.day,
+            "start_period": row.start_period, "room_id": row.room_source_id,
+        } for row in db.scalars(select(ScheduleSessionAssignment).where(
+            ScheduleSessionAssignment.dataset_id == dataset_id,
+            ScheduleSessionAssignment.schedule_id == proposal.baseline_schedule_id,
+        ).order_by(ScheduleSessionAssignment.session_source_id)).all()]
+        request = db.scalar(select(BookingRequest).where(BookingRequest.dataset_id == dataset_id, BookingRequest.source_id == proposal.request_source_id))
+        result["request"] = {"title": request.title, "requester": request.requester, "attendance": request.attendance} if request else None
+        results.append(result)
+    return results
+
+
+@router.post(
+    "/datasets/{dataset_id}/class-move-proposals/{proposal_id}/decision",
+    tags=["bookings"], dependencies=_admin_only(),
+)
+def decide_booking_class_move_endpoint(
+    dataset_id: UUID, proposal_id: UUID,
+    body: DepartmentLabDecisionRequest, db: Session = Depends(get_db), user: User = Depends(current_user),
+):
+    try:
+        return decide_class_move_proposal(
+            db, dataset_id=dataset_id, proposal_id=proposal_id, admin_id=user.id,
+            approve=body.decision == "approve", reject_reason=body.reason,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except BookingApprovalError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @router.post(
     "/datasets/{dataset_id}/schedules/{schedule_id}/bookings/run",
     tags=["bookings"],
     response_model=BookingRunResponse,
+    dependencies=_admin_only(),
     responses={404: {"model": ErrorResponse}, 422: {"model": ErrorResponse}},
 )
-def run_bookings_endpoint(dataset_id: UUID, schedule_id: UUID, db: Session = Depends(get_db)):
+def run_bookings_endpoint(dataset_id: UUID, schedule_id: UUID, db: Session = Depends(get_db), user: User = Depends(current_user)):
     """Run deterministic booking decisions against a schedule in this dataset."""
     try:
-        return run_booking_engine(db, dataset_id, schedule_id)
+        return run_booking_engine(db, dataset_id, schedule_id, initiated_by_user_id=user.id)
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
@@ -699,7 +1114,7 @@ def run_bookings_endpoint(dataset_id: UUID, schedule_id: UUID, db: Session = Dep
     response_model=list[BookingOutcomeResponse],
     responses={404: {"model": ErrorResponse}},
 )
-def get_booking_outcomes_endpoint(dataset_id: UUID, schedule_id: UUID, db: Session = Depends(get_db)):
+def get_booking_outcomes_endpoint(dataset_id: UUID, schedule_id: UUID, db: Session = Depends(get_db), user: User = Depends(current_user)):
     """Return a decision for each request; requests without outcomes are pending."""
     dataset = db.get(Dataset, dataset_id)
     if dataset is None:
@@ -708,7 +1123,12 @@ def get_booking_outcomes_endpoint(dataset_id: UUID, schedule_id: UUID, db: Sessi
     if schedule is None:
         raise HTTPException(status_code=404, detail="Schedule not found for dataset")
 
-    requests = db.scalars(select(BookingRequest).where(BookingRequest.dataset_id == dataset_id).order_by(BookingRequest.submitted_at, BookingRequest.source_id)).all()
+    request_statement = select(BookingRequest).where(BookingRequest.dataset_id == dataset_id)
+    if user.role in {"club_representative", "faculty"}:
+        request_statement = request_statement.where(BookingRequest.created_by_user_id == user.id)
+    elif user.role == "department_coordinator":
+        request_statement = request_statement.where(BookingRequest.department == user.department)
+    requests = db.scalars(request_statement.order_by(BookingRequest.submitted_at, BookingRequest.source_id)).all()
     outcomes = db.scalars(select(BookingOutcome).where(
         BookingOutcome.dataset_id == dataset_id,
         BookingOutcome.schedule_id == schedule_id,
@@ -729,9 +1149,10 @@ def get_booking_outcomes_endpoint(dataset_id: UUID, schedule_id: UUID, db: Sessi
     "/datasets/{dataset_id}/schedules/generate",
     tags=["timetables"],
     response_model=TimetableGenerateResponse,
+    dependencies=_admin_only(),
     responses={404: {"model": ErrorResponse}, 422: {"model": ErrorResponse}, 503: {"model": ErrorResponse}},
 )
-def generate_timetable_endpoint(dataset_id: UUID, body: TimetableGenerateRequest, db: Session = Depends(get_db)):
+def generate_timetable_endpoint(dataset_id: UUID, body: TimetableGenerateRequest, db: Session = Depends(get_db), user: User = Depends(current_user)):
     """Generate and persist a complete weekly timetable and exam plan."""
     try:
         result = generate_schedule(
@@ -740,6 +1161,7 @@ def generate_timetable_endpoint(dataset_id: UUID, body: TimetableGenerateRequest
             team=body.team,
             time_limit_seconds=body.time_limit_seconds,
             warm_start_schedule_id=body.warm_start_schedule_id,
+            created_by_user_id=user.id,
         )
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -771,8 +1193,10 @@ def generate_timetable_endpoint(dataset_id: UUID, body: TimetableGenerateRequest
     tags=["assistant"],
     response_model=AssistantResponse,
 )
-def parse_disruption_endpoint(body: AssistantRequest):
+def parse_disruption_endpoint(body: AssistantRequest, user: User = Depends(current_user)):
     """Parse English/Hinglish disruption text into a proposal or clarification only."""
+    if user.role not in {"admin", "department_coordinator", "faculty"}:
+        raise HTTPException(status_code=403, detail="This role cannot request schedule changes")
     return parse_disruption_request(body)
 
 
@@ -780,13 +1204,16 @@ def parse_disruption_endpoint(body: AssistantRequest):
     "/datasets/{dataset_id}/schedules/{schedule_id}/repair-proposals",
     tags=["disruptions"],
     response_model=RepairProposalResponse,
+    dependencies=_role_access("admin", "department_coordinator", "faculty"),
     responses={404: {"model": ErrorResponse}, 409: {"model": ErrorResponse}, 422: {"model": ErrorResponse}, 503: {"model": ErrorResponse}},
 )
-def create_repair_proposal_endpoint(dataset_id: UUID, schedule_id: UUID, body: RepairProposalRequest, db: Session = Depends(get_db)):
+def create_repair_proposal_endpoint(dataset_id: UUID, schedule_id: UUID, body: RepairProposalRequest, db: Session = Depends(get_db), user: User = Depends(current_user)):
     try:
+        _assert_change_scope(db, dataset_id, user, body.changes)
         return create_repair_proposal(
             db, dataset_id, schedule_id, DisruptionRequest(changes=body.changes),
             time_limit_seconds=body.time_limit_seconds,
+            created_by_user_id=user.id,
         )
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -801,6 +1228,7 @@ def create_repair_proposal_endpoint(dataset_id: UUID, schedule_id: UUID, body: R
 @router.post(
     "/datasets/{dataset_id}/schedules/{schedule_id}/assistant/disruptions/repair-proposals",
     tags=["disruptions"], response_model=AssistantRepairResponse,
+    dependencies=_role_access("admin", "department_coordinator", "faculty"),
     responses={404: {"model": ErrorResponse}, 409: {"model": ErrorResponse}, 422: {"model": ErrorResponse}, 503: {"model": ErrorResponse}},
 )
 def parse_and_propose_repair_endpoint(
@@ -808,6 +1236,7 @@ def parse_and_propose_repair_endpoint(
     schedule_id: UUID,
     body: AssistantRepairRequest,
     db: Session = Depends(get_db),
+    user: User = Depends(current_user),
 ):
     """Interpret a disruption request, then use CP-SAT for a review-only repair proposal."""
     interpretation = parse_disruption_request(body)
@@ -816,9 +1245,11 @@ def parse_and_propose_repair_endpoint(
     if interpretation.proposal.type != "disruption":
         return {"status": "unsupported", "interpretation": interpretation, "repair": None}
     try:
+        _assert_change_scope(db, dataset_id, user, interpretation.proposal.data.changes)
         repair = create_repair_proposal(
             db, dataset_id, schedule_id, interpretation.proposal.data,
             time_limit_seconds=body.time_limit_seconds,
+            created_by_user_id=user.id,
         )
         return {"status": "proposal_ready", "interpretation": interpretation, "repair": repair}
     except LookupError as exc:
@@ -831,11 +1262,19 @@ def parse_and_propose_repair_endpoint(
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
-@router.get("/datasets/{dataset_id}/repair-proposals", tags=["disruptions"], response_model=list[RepairProposalResponse], responses={404: {"model": ErrorResponse}})
-def list_repair_proposals_endpoint(dataset_id: UUID, db: Session = Depends(get_db)):
+@router.get("/datasets/{dataset_id}/repair-proposals", tags=["disruptions"], response_model=list[RepairProposalResponse], responses={404: {"model": ErrorResponse}}, dependencies=_role_access("admin", "department_coordinator", "faculty"))
+def list_repair_proposals_endpoint(dataset_id: UUID, db: Session = Depends(get_db), user: User = Depends(current_user)):
     if db.get(Dataset, dataset_id) is None:
         raise HTTPException(status_code=404, detail="Dataset not found")
-    return list_repair_proposals(db, dataset_id)
+    booking_move_ids = set(db.scalars(select(BookingClassMoveProposal.repair_proposal_id).where(BookingClassMoveProposal.dataset_id == dataset_id)).all())
+    proposals = [row for row in list_repair_proposals(db, dataset_id) if row["proposal_id"] not in booking_move_ids]
+    if user.role == "admin":
+        return proposals
+    owned_ids = set(db.scalars(select(ScheduleRepairProposal.id).where(
+        ScheduleRepairProposal.dataset_id == dataset_id,
+        ScheduleRepairProposal.created_by_user_id == user.id,
+    )).all())
+    return [proposal for proposal in proposals if proposal["proposal_id"] in owned_ids]
 
 
 @router.get(
@@ -843,9 +1282,15 @@ def list_repair_proposals_endpoint(dataset_id: UUID, db: Session = Depends(get_d
     tags=["disruptions"], response_model=RepairProposalResponse,
     responses={404: {"model": ErrorResponse}},
 )
-def get_repair_proposal_endpoint(dataset_id: UUID, schedule_id: UUID, proposal_id: UUID, db: Session = Depends(get_db)):
+def get_repair_proposal_endpoint(dataset_id: UUID, schedule_id: UUID, proposal_id: UUID, db: Session = Depends(get_db), user: User = Depends(current_user)):
     try:
-        return get_repair_proposal(db, dataset_id, schedule_id, proposal_id)
+        result = get_repair_proposal(db, dataset_id, schedule_id, proposal_id)
+        proposal = db.get(ScheduleRepairProposal, proposal_id)
+        if user.role != "admin" and (proposal is None or proposal.created_by_user_id != user.id):
+            raise HTTPException(status_code=403, detail="You can view only your own repair proposals")
+        if db.scalar(select(BookingClassMoveProposal.id).where(BookingClassMoveProposal.dataset_id == dataset_id, BookingClassMoveProposal.repair_proposal_id == proposal_id)):
+            raise HTTPException(status_code=409, detail="This solver proposal belongs to a booking class-move workflow")
+        return result
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -853,11 +1298,14 @@ def get_repair_proposal_endpoint(dataset_id: UUID, schedule_id: UUID, proposal_i
 @router.post(
     "/datasets/{dataset_id}/schedules/{schedule_id}/repair-proposals/{proposal_id}/approve",
     tags=["disruptions"], response_model=RepairProposalResponse,
+    dependencies=_admin_only(),
     responses={404: {"model": ErrorResponse}, 409: {"model": ErrorResponse}},
 )
-def approve_repair_proposal_endpoint(dataset_id: UUID, schedule_id: UUID, proposal_id: UUID, db: Session = Depends(get_db)):
+def approve_repair_proposal_endpoint(dataset_id: UUID, schedule_id: UUID, proposal_id: UUID, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    if db.scalar(select(BookingClassMoveProposal.id).where(BookingClassMoveProposal.dataset_id == dataset_id, BookingClassMoveProposal.repair_proposal_id == proposal_id)):
+        raise HTTPException(status_code=409, detail="Use the booking class-move approval workflow for this proposal")
     try:
-        return approve_repair_proposal(db, dataset_id, schedule_id, proposal_id)
+        return approve_repair_proposal(db, dataset_id, schedule_id, proposal_id, decided_by_user_id=user.id)
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except RepairError as exc:
@@ -867,11 +1315,14 @@ def approve_repair_proposal_endpoint(dataset_id: UUID, schedule_id: UUID, propos
 @router.post(
     "/datasets/{dataset_id}/schedules/{schedule_id}/repair-proposals/{proposal_id}/reject",
     tags=["disruptions"], response_model=RepairProposalResponse,
+    dependencies=_admin_only(),
     responses={404: {"model": ErrorResponse}, 409: {"model": ErrorResponse}, 422: {"model": ErrorResponse}},
 )
-def reject_repair_proposal_endpoint(dataset_id: UUID, schedule_id: UUID, proposal_id: UUID, body: RepairRejectRequest, db: Session = Depends(get_db)):
+def reject_repair_proposal_endpoint(dataset_id: UUID, schedule_id: UUID, proposal_id: UUID, body: RepairRejectRequest, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    if db.scalar(select(BookingClassMoveProposal.id).where(BookingClassMoveProposal.dataset_id == dataset_id, BookingClassMoveProposal.repair_proposal_id == proposal_id)):
+        raise HTTPException(status_code=409, detail="Use the booking class-move decision workflow for this proposal")
     try:
-        return reject_repair_proposal(db, dataset_id, schedule_id, proposal_id, body.reason)
+        return reject_repair_proposal(db, dataset_id, schedule_id, proposal_id, body.reason, decided_by_user_id=user.id)
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except RepairError as exc:
@@ -893,12 +1344,22 @@ def get_timetable_assignments_endpoint(
     course_id: str | None = None,
     group_id: str | None = None,
     db: Session = Depends(get_db),
+    user: User = Depends(current_user),
 ):
+    if user.role == "club_representative":
+        raise HTTPException(status_code=403, detail="Timetable assignments are unavailable for this role")
+    if user.role == "faculty":
+        if faculty_id is not None and faculty_id != user.faculty_source_id:
+            raise HTTPException(status_code=403, detail="Faculty can view only their own timetable")
+        faculty_id = user.faculty_source_id
     try:
-        return get_schedule_assignments(
+        result = get_schedule_assignments(
             db, dataset_id, schedule_id, day=day, faculty_id=faculty_id,
             room_id=room_id, course_id=course_id, group_id=group_id,
         )
+        if user.role == "department_coordinator":
+            result["assignments"] = [row for row in result["assignments"] if row["department"] == user.department]
+        return result
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -907,6 +1368,7 @@ def get_timetable_assignments_endpoint(
     "/datasets/{dataset_id}/schedules/{schedule_id}/export",
     tags=["timetables"],
     response_model=ScheduleExportResponse,
+    dependencies=_admin_only(),
     responses={404: {"model": ErrorResponse}, 409: {"model": ErrorResponse}},
 )
 def export_timetable_endpoint(dataset_id: UUID, schedule_id: UUID, db: Session = Depends(get_db)):

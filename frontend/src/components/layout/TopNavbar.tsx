@@ -4,6 +4,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { routeTitles } from './navigation'
 import { UserProfile } from './UserProfile'
 import { useDatasetContext } from '../../context/DatasetContext'
+import { homeForRole, useAuth } from '../../auth/AuthContext'
 
 type TopNavbarProps = {
   onMenuClick: () => void
@@ -12,6 +13,7 @@ type TopNavbarProps = {
 
 export function TopNavbar({ onMenuClick, isMobileMenuOpen }: TopNavbarProps) {
   const { pathname } = useLocation()
+  const { user } = useAuth()
   const [search, setSearch] = useState('')
   const [showNotice, setShowNotice] = useState(false)
   const { datasets, selectedDatasetId, selectDataset, loading: datasetsLoading } = useDatasetContext()
@@ -30,7 +32,7 @@ export function TopNavbar({ onMenuClick, isMobileMenuOpen }: TopNavbarProps) {
           {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
         <div className="breadcrumbs" aria-label="Breadcrumb">
-          <Link to="/dashboard">Campus</Link>
+          <Link to={user ? homeForRole(user.role) : '/'}>Campus</Link>
           <ChevronRight size={14} aria-hidden="true" />
           <span aria-current="page">{title}</span>
         </div>

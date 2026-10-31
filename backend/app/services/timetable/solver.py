@@ -589,6 +589,7 @@ def generate_schedule(
     team: str = "AXIOM",
     time_limit_seconds: float = 120,
     warm_start_schedule_id: UUID | None = None,
+    created_by_user_id: UUID | None = None,
 ) -> SolveResult:
     """Solve and persist a full session and exam schedule for one dataset."""
     transaction = db.begin_nested() if db.in_transaction() else db.begin()
@@ -647,7 +648,7 @@ def generate_schedule(
         )
 
         schedule_source_id = f"cp-sat-{uuid4()}"
-        schedule = Schedule(dataset_id=dataset_id, source_id=schedule_source_id, team=team)
+        schedule = Schedule(dataset_id=dataset_id, source_id=schedule_source_id, team=team, created_by_user_id=created_by_user_id)
         db.add(schedule)
         db.flush()
         db.add_all([
