@@ -295,8 +295,14 @@
   .ops-page, .ops-grid, .ops-card-grid { width: 100%; min-width: 0; max-width: 100%; }
   .ops-grid, .ops-card-grid { grid-template-columns: minmax(0, 1fr); }
   .ops-grid > *, .ops-card-grid > * { min-width: 0; max-width: 100%; }
+  .assignments-table-scroll { max-width: 100%; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; touch-action: pan-x pan-y; }
+  .assignments-table { width: max-content; min-width: 900px; }
+  .assignments-scroll-hint { display: block; margin-top: 5px; color: var(--ink-500); font-size: 11px; }
   .ops-toolbar { align-items: stretch; }
   .ops-field { flex-basis: 100%; }
   .ops-button-row { width: 100%; }
   .ops-button-row .ops-button { flex: 1 1 auto; }
+}
+@media (min-width: 761px) {
+  .assignments-scroll-hint { display: none; }
 }
