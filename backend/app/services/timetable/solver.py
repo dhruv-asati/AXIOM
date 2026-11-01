@@ -153,6 +153,7 @@ def _build_and_solve(
     repair_group_weight: int = 5,
     hint_assignments: dict[str, tuple[str, int, str]] | None = None,
     hint_exam_assignments: dict[str, tuple[str, str, list[str]]] | None = None,
+    movable_session_ids: set[str] | None = None,
 ) -> SolverSolution:
     calendar = dataset.calendar or {}
     days = list(calendar.get("days") or [])
@@ -187,6 +188,10 @@ def _build_and_solve(
     hint_assignments = hint_assignments if hint_assignments is not None else baseline_assignments
     hint_exam_assignments = hint_exam_assignments if hint_exam_assignments is not None else baseline_exam_assignments
     removed_session_ids = removed_session_ids or set()
+    # Repair models start from a valid baseline. Keep unaffected sessions at
+    # their baseline time and room so CP-SAT only searches the disruption's
+    # local impact area instead of rebuilding the full timetable search space.
+    movable_session_ids = movable_session_ids if movable_session_ids is not None else set(sessions_by_id)
     session_y: dict[tuple[str, str, int], cp_model.IntVar] = {}
     session_x: dict[tuple[str, str, int, str], cp_model.IntVar] = {}
     session_candidates: dict[str, list[tuple[str, int]]] = defaultdict(list)
@@ -204,9 +209,14 @@ def _build_and_solve(
         faculty_un = faculty_unavailable[session.faculty_source_id]
         fixed = session.fixed_slot or None
         for day in days:
+            baseline = baseline_assignments.get(session.source_id)
+            if repair_mode and session.source_id not in movable_session_ids and baseline and day != baseline[0]:
+                continue
             if fixed and day != fixed.get("day"):
                 continue
             for start in teaching_periods:
+                if repair_mode and session.source_id not in movable_session_ids and baseline and start != baseline[1]:
+                    continue
                 end = start + duration - 1
                 occupied = range(start, end + 1)
                 if end > last_period or any(period not in teaching_periods for period in occupied):
@@ -221,6 +231,8 @@ def _build_and_solve(
                     continue
                 fitting_rooms = []
                 for room in rooms:
+                    if repair_mode and session.source_id not in movable_session_ids and baseline and room.source_id != baseline[2]:
+                        continue
                     if session.kind not in (room.allowed_uses or []):
                         continue
                     if room.type not in (session.room_types or []):

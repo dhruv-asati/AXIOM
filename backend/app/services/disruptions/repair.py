@@ -326,6 +326,8 @@ def create_repair_proposal(
         if set(exams_by_id) != {exam.source_id for exam in exams}:
             raise RepairError("The baseline schedule has an incomplete exam allocation")
 
+        affected = _affected_sessions(request.changes, baseline, sessions_by_id, group_map)
+        movable_session_ids = affected | added_session_ids
         try:
             solution = _build_and_solve(
                 dataset,
@@ -343,13 +345,13 @@ def create_repair_proposal(
                 removed_session_ids=removed_session_ids,
                 repair_change_weight=REPAIR_CHANGE_WEIGHT,
                 repair_group_weight=REPAIR_GROUP_WEIGHT,
+                movable_session_ids=movable_session_ids,
             )
         except InfeasibleTimetableError as exc:
             raise RepairInfeasibleError(f"No feasible repair exists: {exc}") from exc
         except TimetableTimeoutError as exc:
             raise RepairTimeoutError(str(exc)) from exc
 
-        affected = _affected_sessions(request.changes, baseline, sessions_by_id, group_map)
         changed = set(solution.changed_session_ids)
         for sid in added_session_ids | removed_session_ids:
             changed.add(sid)
