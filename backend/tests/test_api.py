@@ -145,6 +145,7 @@ def test_health_cors_docs_openapi_and_dataset_routes(api_client):
     assert openapi.status_code == 200
     paths = openapi.json()["paths"]
     assert "/api/v1/health" in paths
+    assert "/api/v1/ready" in paths
     assert "/api/v1/datasets/import" in paths
     assert "/api/v1/datasets/{dataset_id}/schedules/generate" in paths
     assert "/api/v1/datasets/{dataset_id}/schedules/{schedule_id}/assignments" in paths

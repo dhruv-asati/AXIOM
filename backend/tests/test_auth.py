@@ -8,7 +8,7 @@ import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, event
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
@@ -92,7 +92,28 @@ def login(client: TestClient, username: str, password: str):
 def test_health_is_public_and_protected_api_requires_a_session(auth_client):
     client, _engine, _ids, dataset_id, _other = auth_client
     assert client.get("/api/v1/health").status_code == 200
+    ready = client.get("/api/v1/ready")
+    assert ready.status_code == 200
+    assert ready.json() == {"status": "ready", "database": "available"}
     assert client.get(f"/api/v1/datasets/{dataset_id}/rooms").status_code == 401
+
+
+def test_readiness_database_failure_is_safe_and_not_reported_as_healthy(auth_client):
+    client, *_ = auth_client
+
+    class BrokenSession:
+        def execute(self, statement):
+            raise OperationalError(str(statement), {}, Exception("private connection detail"))
+
+    def broken_db():
+        yield BrokenSession()
+
+    app.dependency_overrides[get_db] = broken_db
+    response = client.get("/api/v1/ready")
+    assert response.status_code == 503
+    assert response.json() == {"detail": "Database is unavailable or the required schema migration is pending."}
+    assert "private connection detail" not in response.text
+    assert client.get("/api/v1/health").status_code == 200
 
 
 def test_invalid_credentials_are_rejected(auth_client):
@@ -148,6 +169,19 @@ def test_role_cannot_escalate_and_dataset_scope_is_enforced(auth_client):
     headers = {"Origin": "http://testserver", "X-CSRF-Token": csrf}
     assert client.put(f"/api/v1/datasets/{dataset_id}/priority-order", json={"priority_order": ["club_event"]}, headers=headers).status_code == 403
     assert client.get(f"/api/v1/datasets/{other_dataset_id}/rooms").status_code == 403
+
+
+@pytest.mark.parametrize("username,password", [
+    ("demo-coordinator", PASSWORDS["coordinator"]),
+    ("demo-faculty", PASSWORDS["faculty"]),
+    ("demo-club", PASSWORDS["club"]),
+])
+def test_non_admin_roles_cannot_access_demo_reset(auth_client, username, password):
+    client, _engine, _ids, dataset_id, _other = auth_client
+    auth = login(client, username, password)
+    headers = {"Origin": "http://testserver", "X-CSRF-Token": auth.json()["csrf_token"]}
+    response = client.post(f"/api/v1/datasets/{dataset_id}/demo-reset", headers=headers)
+    assert response.status_code == 403
 
 
 def test_club_booking_identity_is_derived_from_session(auth_client):

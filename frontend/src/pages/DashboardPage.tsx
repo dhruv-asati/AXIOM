@@ -11,6 +11,7 @@ import type { BookingRequestRecord, DashboardSummary } from '../types/api'
 import { PageHeader } from '../components/layout/PageHeader'
 import { SpecularCard } from '../components/ui/SpecularCard'
 import { MagicBento } from '../components/ui/MagicBento'
+import { dashboardErrorState } from '../lib/dashboardState.mjs'
 import './Operations.css'
 
 export function DashboardPage() {
@@ -49,9 +50,16 @@ export function DashboardPage() {
       setApiAvailable(true)
     } catch (cause) {
       if (controller.signal.aborted) return
-      setApiAvailable(false)
-      setError(cause instanceof Error ? cause.message : 'Dashboard data could not be loaded')
-      setLoadedDatasetId(selectedDatasetId)
+      const failedState = dashboardErrorState(
+        selectedDatasetId,
+        cause instanceof Error ? cause.message : 'Dashboard data could not be loaded',
+      )
+      // A failed dataset switch must never render the previous dataset's data.
+      setSummary(failedState.summary)
+      setBookings(failedState.bookings)
+      setApiAvailable(failedState.apiAvailable)
+      setError(failedState.error)
+      setLoadedDatasetId(failedState.loadedDatasetId)
     } finally {
       if (!controller.signal.aborted) setLoading(false)
     }

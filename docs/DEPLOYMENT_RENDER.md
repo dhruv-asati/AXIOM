@@ -1,6 +1,6 @@
 # Render deployment preparation
 
-AXIOM is prepared for a single Docker web service: Vite builds the React SPA, and FastAPI serves that build and the `/api/v1` API from one origin. Supabase PostgreSQL remains external. This repository configuration does not deploy the app or run database migrations.
+AXIOM is configured as a single Docker web service: Vite builds the React SPA, and FastAPI serves that build and the `/api/v1` API from one origin. Supabase PostgreSQL remains external. The public app is deployed at `https://axiom-5uf0.onrender.com`; repository documentation and local changes do not themselves deploy code or alter Render settings. Migrations are not run at startup.
 
 ## Local Docker verification
 
@@ -48,9 +48,9 @@ AXIOM does not run migrations automatically at startup, and `render.yaml` has no
 
 ## Authentication and authorization
 
-The API now has four server-defined roles, database-backed opaque sessions, password hashing, `HttpOnly` cookies, Origin/CSRF checks, a per-process login rate limiter, role checks and dataset/department/faculty/club scoping. `/api/v1/health` remains public; other API routes require a session. See [role access and demo account setup](ROLE_ACCESS.md).
+The API now has four server-defined roles, database-backed opaque sessions, password hashing, `HttpOnly` cookies, Origin/CSRF checks, a per-process login rate limiter, role checks and dataset/department/faculty/club scoping. `/api/v1/health` and `/api/v1/ready` are public system checks; protected application routes retain session, CSRF, role and data-scope checks. See [role access and demo account setup](ROLE_ACCESS.md).
 
-The auth migration (`31c4d6a2f809`) is pending review and has **not** been applied to Supabase. Do not expose protected workflows until a reviewed migration is applied and four role-specific accounts have been provisioned. Configure `AXIOM_DEMO_ACCOUNTS_JSON` only as a protected Render secret; use the manual provision command in the Render Shell after database migration and dataset import. Never put account credentials in the frontend build.
+The project operator reports that auth/booking migrations have been applied and the four demo users are provisioned. This repository audit did not connect to Supabase to verify its revision or inspect accounts. Demo usernames and roles are documented in the README; passwords remain private. Do not run the account provisioning command for the existing demo. Never put account credentials in the frontend build. `GET /api/v1/ready` is public in the local source after the readiness fix and performs `SELECT 1`; the previously audited deployed version returned 401, so the deployed response remains unverified until a separately authorized deployment updates it.
 
 ## Render Free considerations
 
@@ -62,8 +62,6 @@ The CP-SAT solver retains its existing one-worker deterministic configuration an
 
 1. Review this diff and keep production secrets out of Git and Vite variables.
 2. Build and run the Docker image locally; verify the UI, a refreshed `/dashboard`, an emitted static asset, `/api/v1/health`, and JSON behavior for a missing API route.
-3. Confirm the current Supabase migration revision and required migrations independently. Apply only a reviewed and explicitly approved migration from a secure operator environment; this service does not apply it.
-4. Review and deliberately apply the pending auth migration, import the intended dataset, then provision four role-specific accounts with the documented command.
-5. After those checks and approval, create/sync the Render Blueprint, set `DATABASE_URL` in the Render secret UI, and verify health and readiness after startup. Provisioned judge credentials must be delivered privately.
-
-No Render resource has been created by this preparation.
+3. If a future schema migration is required, independently confirm the current Supabase revision and review the migration SQL and backup before any separately authorized apply. No migration is part of this readiness audit.
+4. Do not reprovision existing judge accounts. Verify each login and role privately through the live UI when authorized.
+5. A future code release requires the team's normal separate deployment approval. After it, verify health, readiness and authenticated role workflows. This task has not deployed or restarted Render.

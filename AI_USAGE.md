@@ -1,11 +1,13 @@
-# AI usage
+# AI usage disclosure
 
-This document records AI assistance used while building AXIOM. Update it as the team uses AI tools during implementation, including the tool, affected work, and human review performed.
+AI coding assistance (OpenAI Codex) was used during AXIOM planning, implementation, debugging, testing support, and documentation. Human team members supplied requirements, selected product behavior, inspected generated changes, and ran local and integration checks.
 
-## Initial project foundation
+## AI-assisted work
 
-AI assistance was used to scaffold and document the initial project structure and placeholder frontend. The team should review generated code and documentation before extending it.
+AI assistance contributed to the project foundation and modular backend; SQLAlchemy models and Alembic setup; dataset import, booking, timetable, and disruption workflows; API integration and tests; and React/TypeScript interface components, styling, and documentation. It also helped diagnose and refine UI behavior from user-provided screenshots and recordings. The final repository contains a mix of human-authored, AI-assisted, and iteratively edited work; individual lines are not attributed to a particular author.
 
-## Stage 12 integration
+AXIOM's in-app request assistant uses deterministic local parsing and rules. User request text is not sent to a hosted LLM by the application. AI used during development is separate from runtime behavior.
 
-AI assistance was used to connect the React interfaces to existing FastAPI routes, add dataset upload safeguards and integration documentation, and prepare frontend operational pages for datasets, timetable, rooms, bookings, examinations, analytics, the request parser, and disruption proposals. The implementation was reviewed against the existing API schemas and verified with the backend test suite, TypeScript production build, and official baseline schedule validator. No external hosted LLM calls were added. Human review is still required before applying the pending database migrations or using the app outside a trusted development environment.
+## Review and limitations
+
+AI output was treated as a draft and reviewed against repository contracts, starter-pack constraints, and observed test/validator results. Review does not replace operator verification of the deployed database, role accounts, third-party license terms, or the final judge workflow. The compliance evidence and remaining checks are recorded in [docs/FINAL_SUBMISSION_AUDIT.md](docs/FINAL_SUBMISSION_AUDIT.md).

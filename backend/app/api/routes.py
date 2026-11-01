@@ -322,7 +322,7 @@ def health_check() -> dict[str, str]:
     return {"status": "ok", "service": "axiom-api"}
 
 
-@router.get("/ready", tags=["system"])
+@public_router.get("/ready", tags=["system"])
 def readiness_check(db: Session = Depends(get_db)):
     db.execute(text("SELECT 1"))
     return {"status": "ready", "database": "available"}

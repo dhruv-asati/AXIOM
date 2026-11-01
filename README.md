@@ -4,6 +4,37 @@ AXIOM is an Intelligent Campus Scheduling and Venue Management Platform built fo
 
 The starter pack guide is preserved at [docs/STARTER_PACK_README.md](docs/STARTER_PACK_README.md).
 
+## Architecture
+
+```mermaid
+flowchart LR
+  U[Campus user] --> UI[React + TypeScript client]
+  UI -->|same-origin JSON API| API[FastAPI]
+  API --> AUTH[Session authentication and role checks]
+  API --> SVC[Dataset, booking, timetable, exam and disruption services]
+  SVC --> ORM[SQLAlchemy]
+  ORM --> DB[(Supabase PostgreSQL)]
+  SVC --> SOLVER[OR-Tools CP-SAT]
+  DATA[Dataset JSON + CSV] --> IMPORT[Dataset importer]
+  IMPORT --> DB
+  SVC --> EXPORT[Validator-format schedule export]
+  EXPORT -. local verification .-> VALIDATOR[Official validator.py]
+  BUILD[Vite production build] --> API
+```
+
+In production, the Render Docker service builds the Vite client and FastAPI serves the static client and API from one origin. PostgreSQL is hosted by Supabase; credentials stay in the backend environment. The official validator is a local submission check, not an API service.
+
+## Technology stack
+
+| Area | Technology |
+| --- | --- |
+| Frontend | React, TypeScript, Vite |
+| Backend API | Python, FastAPI, Pydantic |
+| Database and ORM | Supabase PostgreSQL, SQLAlchemy, Psycopg |
+| Schema migrations | Alembic |
+| Timetable optimization | Google OR-Tools CP-SAT |
+| Deployment | Render Docker web service |
+
 ## Repository contents
 
 - `backend/` — FastAPI, SQLAlchemy, Alembic, Pydantic settings, and service boundaries.
@@ -71,33 +102,33 @@ npm run dev
 
 Vite prints the local app URL (normally `http://localhost:5173`). `VITE_API_URL` in `frontend/.env.local` controls the backend base URL. The public landing page is available at `/`; sign-in at `/login` uses the backend's HttpOnly session cookie. Protected navigation is based on the role returned by the server. See [frontend setup](frontend/README.md) and [role access and demo account setup](docs/ROLE_ACCESS.md).
 
-## Render deployment preparation
+## Deployment
 
-The repository includes a root Dockerfile and Render Blueprint for one Docker web service. FastAPI serves the production-built React app and API from the same origin. Review [the Render deployment guide](docs/DEPLOYMENT_RENDER.md) before building or creating a Render service. Authentication and booking approvals require the pending migrations to be reviewed and applied before use. Database migrations remain manual and are never run at application startup.
+The public repository is [github.com/dhruv-asati/AXIOM](https://github.com/dhruv-asati/AXIOM), and the public demo is [axiom-5uf0.onrender.com](https://axiom-5uf0.onrender.com). The repository includes a root Dockerfile and Render Blueprint for one Docker web service. FastAPI serves the production-built React app and API from the same origin. The configured Render Free service can sleep after inactivity, so allow time for a cold start. A public readiness endpoint is intended to check database connectivity; verify it and authenticated workflows on the deployed version after deployment. Database migrations remain manual and are never run at application startup. See [the Render deployment guide](docs/DEPLOYMENT_RENDER.md).
 
 ## Authentication and demo accounts
 
-AXIOM supports exactly four roles: `admin`, `department_coordinator`, `faculty`, and `club_representative`. There are no bundled usernames or passwords. Create four unique, strong credentials and provision them from a protected environment variable after applying the pending auth migration. Do not commit the values or place them in frontend configuration. Full steps and the per-role account context are in [docs/ROLE_ACCESS.md](docs/ROLE_ACCESS.md).
+AXIOM supports four roles: `admin`, `department_coordinator`, `faculty`, and `club_representative`. The demo instance has these pre-provisioned usernames; passwords are shared privately and are intentionally not stored in this repository:
 
-| Demo account | Required account context |
+| Username | Role |
 | --- | --- |
-| Admin | Campus-wide; no dataset or department assignment. |
-| Department coordinator | Imported dataset source ID and an existing department in that dataset. |
-| Faculty | Imported dataset source ID and a faculty source ID from that dataset; department is derived from the faculty record. |
-| Club representative | Imported dataset source ID and a club identifier. |
+| `admin` | Campus administrator |
+| `coordinator` | Department coordinator |
+| `faculty` | Faculty member |
+| `robotics` | Club representative |
 
-After migrations and dataset import, set `AXIOM_DEMO_ACCOUNTS_JSON` to a JSON array containing exactly one object for each role (with unique username and password, plus that role's context), then run `python -m app.commands.provision_demo_accounts` from `backend/`. The command enforces 14-character minimum passwords, stores scrypt hashes, and does not print credentials. It is idempotent only when existing usernames, passwords and contexts match; it refuses to reset or overwrite an existing account. Assign department ownership to lab rooms in Room Management before using coordinator lab approvals. In Render, set the JSON as a protected secret, run the same command from the Render Shell, then privately share each account's username and initial password with judges. Never put populated JSON in the repository. See the linked guide for the exact JSON shape and PowerShell command.
+The project operator reports that these accounts are provisioned in the demo environment; this repository cannot verify live account state. Do not run the provisioning command or reset their passwords as part of ordinary demo setup. For a separately controlled environment, see [role access and account provisioning](docs/ROLE_ACCESS.md); never commit populated account JSON or share passwords publicly.
 
 ## Database migrations
 
-Alembic is configured in `backend/alembic.ini`; authentication and booking approvals use revisions `31c4d6a2f809` and `4a92d6c1e7b0`. Review generated SQL before applying. Run from `backend/`:
+Alembic is configured in `backend/alembic.ini`. The repository migration chain is `415e1b5d6866` → `8c41d892c2aa` → `cd9a2f1b7e40` → `31c4d6a2f809` → `4a92d6c1e7b0` → `f6e774ed4a42`. The project operator's latest reported Supabase revision is `f6e774ed4a42`; this README does not substitute for checking a target database. Inspect the current revision read-only before planning any schema change. Migration commands, if intentionally needed in a separately approved environment, are:
 
 ```powershell
 alembic revision --autogenerate -m "describe schema"
 alembic upgrade head
 ```
 
-Neither migration is applied automatically. Applying them adds authentication/session and booking-approval data; downgrading removes that new data, room ownership assignments, and recorded human decisions. Confirm `DATABASE_URL` and back up the database before any intentional apply or downgrade. Never use application startup to migrate a database.
+Migrations are never applied automatically. Do not run `upgrade` or `downgrade` against the demo Supabase database as part of setup. Confirm `DATABASE_URL`, inspect the current revision, and take a backup before a separately approved migration. Downgrades can remove application data.
 
 ## Generate and validate a timetable
 
@@ -124,11 +155,19 @@ See [Team structure](docs/TEAM_STRUCTURE.md), [API contracts](docs/API_CONTRACTS
 python validator.py --data data/cit_public.json --schedule exports/schedule.json
 ```
 
+`exports/schedule.json` is the baseline weekly timetable. `exports/schedule_after.json`, when present, is the result of applying `examples/sample_disruption.json` through the disruption repair workflow. Validate the pair with the official validator's disruption comparison mode:
+
+```powershell
+python validator.py --data data/cit_public.json --schedule exports/schedule_after.json --disruption examples/sample_disruption.json --baseline exports/schedule.json
+```
+
+The validator reports hard violations separately from soft-constraint penalties. Do not treat a missing export or an unverified output as a valid schedule.
+
 ## Campus operations workflow
 
 The application now includes dataset management, timetable generation and review, room directory and utilisation, examination allocations, booking review and deterministic booking decisions, a review-only request assistant, and disruption repair proposals. From the UI, use **Datasets** to import JSON plus optional CSV supplements, select the dataset in the top bar, generate a schedule in **Timetable**, then review bookings, examinations and rooms. Disruption proposals are solver-generated previews; approving one explicitly creates a new schedule and preserves the baseline.
 
-The assistant is a deterministic parser and proposal handoff. It does not approve bookings or disruptions. Authentication and four-role authorization are implemented, but the role-auth migration must be reviewed/applied and demo accounts provisioned before public use. Dashboard and analytics values are read from the backend. Live room occupancy is intentionally shown as unavailable because no check-in telemetry source is connected.
+The assistant is a deterministic parser and proposal handoff. It does not approve bookings or disruptions. Four-role authentication and authorization are implemented. Dashboard and analytics values are read from the backend. Live room occupancy is intentionally shown as unavailable because no check-in telemetry source is connected. Timetable generation requires a feasible uploaded dataset; it returns an infeasible result rather than treating a partial schedule as valid.
 
 ### Import through the application
 
@@ -136,13 +175,7 @@ Open `http://localhost:5173/datasets`. Select the dataset JSON and, if applicabl
 
 ### Migration safety
 
-Current database environments may not have the Stage 11 and Stage 12 migrations. Check the configured target first with `alembic current` from `backend/`. To preview SQL without applying it, use:
-
-```powershell
-python -m alembic -c alembic.ini upgrade head --sql
-```
-
-After confirming `DATABASE_URL` points to the intended environment and reviewing the SQL, apply migrations explicitly with `python -m alembic -c alembic.ini upgrade head`. This command mutates that configured database; it is not run automatically by AXIOM. Stage 12 adds repair-proposal persistence and `schedules.created_at` for schedule history.
+The deployment's schema is managed separately from application startup. Before any schema work, run a read-only `alembic current` against the specifically intended target and compare it with the migration chain above. Preview and review SQL before an intentionally approved migration; never infer the live database revision from local files. Do not run migrations as part of demo setup.
 
 ### Backend tests and frontend build
 
