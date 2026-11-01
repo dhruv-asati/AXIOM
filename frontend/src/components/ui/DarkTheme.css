@@ -268,6 +268,12 @@
 .application-shell[data-theme="dark"] .content-container .session-details-dialog .session-detail-kind { border-color: #4a554e; color: #e1e8e2; background: #303934; }
 .application-shell[data-theme="dark"] .content-container .session-details-dialog .session-detail-kind.kind-lab { border-color: #46624d; color: #c4dec9; background: #29382d; }
 .application-shell[data-theme="dark"] .content-container .session-details-dialog .session-detail-kind.kind-tutorial { border-color: #69593b; color: #e5d1a3; background: #393225; }
+.application-shell[data-theme="dark"] .content-container .assignment-mobile-card { border-color: #465149; background: #29322d; }
+.application-shell[data-theme="dark"] .content-container .assignment-mobile-title { color: #edf2ee; }
+.application-shell[data-theme="dark"] .content-container .assignment-mobile-title span { border-color: #4b574f; color: #d3ddd5; background: #343e38; }
+.application-shell[data-theme="dark"] .content-container .assignment-mobile-card dl { border-color: #465149; }
+.application-shell[data-theme="dark"] .content-container .assignment-mobile-card dt { color: #b5c0b8; }
+.application-shell[data-theme="dark"] .content-container .assignment-mobile-card dd { color: #edf2ee; }
 .application-shell[data-theme="dark"] .content-container .academic-grid-scroll::-webkit-scrollbar-track,
 .application-shell[data-theme="dark"] .content-container .ops-table-wrap::-webkit-scrollbar-track { background: #252e29; }
 .application-shell[data-theme="dark"] .content-container .academic-grid-scroll::-webkit-scrollbar-thumb,
