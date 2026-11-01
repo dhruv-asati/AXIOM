@@ -31,7 +31,7 @@ a { color: inherit; text-decoration: none; }
 button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid #8fa4ff; outline-offset: 3px; }
 #root { min-height: 100vh; }
 
-.application-shell { position: relative; z-index: 1; min-height: 100vh; }
+.application-shell { position: relative; z-index: 1; min-height: 100vh; overflow-x: clip; }
 .forbidden-page { position: relative; z-index: 1; }
 .app-sidebar {
   position: fixed; z-index: 50; inset: 0 auto 0 0; display: flex; width: var(--sidebar-width);
@@ -203,8 +203,11 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
   .profile-avatar { width: 32px; height: 32px; }
   .main-content { min-height: 100vh; padding: 0 20px; }
   .application-shell:has(.floating-menu-root[data-corner$="right"]) .main-content { padding-right: 72px; }
-  .application-shell:has(.floating-menu-root[data-corner$="left"]) .main-content { padding-left: 84px; }
-  .content-container { padding: 32px 0 46px; }
+  .application-shell:has(.floating-menu-root[data-corner$="left"]) .main-content { padding-left: 20px; }
+  .content-container { width: 100%; max-width: 100%; min-width: 0; padding: 82px 0 46px; }
+  .page-header { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .page-header-action { align-self: flex-start; max-width: 100%; }
+  .page-header-action > * { max-width: 100%; }
   .page-header { margin-bottom: 25px; }
   .dashboard-intro { min-height: 220px; padding: 28px 25px; }
   .intro-copy { max-width: 75%; }
@@ -222,7 +225,7 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
   .profile-menu { right: -3px; }
   .main-content { padding-right: 17px; padding-left: 17px; }
   .application-shell:has(.floating-menu-root[data-corner$="right"]) .main-content { padding-right: 68px; }
-  .application-shell:has(.floating-menu-root[data-corner$="left"]) .main-content { padding-left: 80px; }
+  .application-shell:has(.floating-menu-root[data-corner$="left"]) .main-content { padding-left: 17px; }
   .page-header h1 { font-size: 26px; }
   .page-description { font-size: 11px; }
   .dashboard-intro { min-height: 235px; padding: 25px 20px; }

@@ -292,6 +292,9 @@
 .application-shell .ops-empty span { font-size: 12px; line-height: 1.6; }
 @media (max-width: 760px) {
   .ops-card { padding: 14px; }
+  .ops-page, .ops-grid, .ops-card-grid { width: 100%; min-width: 0; max-width: 100%; }
+  .ops-grid, .ops-card-grid { grid-template-columns: minmax(0, 1fr); }
+  .ops-grid > *, .ops-card-grid > * { min-width: 0; max-width: 100%; }
   .ops-toolbar { align-items: stretch; }
   .ops-field { flex-basis: 100%; }
   .ops-button-row { width: 100%; }

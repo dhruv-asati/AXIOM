@@ -29,7 +29,10 @@ export function FloatingMenu({ items }: { items: FloatingMenuItem[] }) {
   useEffect(() => {
     const media = window.matchMedia('(max-width: 760px)')
     const closeOnOutside = (event: PointerEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setActivePanel(null)
+      if (!rootRef.current?.contains(event.target as Node)) {
+        setActivePanel(null)
+        setMobileOpen(false)
+      }
     }
     const onMediaChange = () => setMobileOpen(false)
     document.addEventListener('pointerdown', closeOnOutside)
@@ -86,7 +89,7 @@ export function FloatingMenu({ items }: { items: FloatingMenuItem[] }) {
               <div className={`floating-menu-entry${expanded ? ' is-expanded' : ''}${item.href && location.pathname === item.href ? ' is-current' : ''}`} key={item.id}>
                 {item.href ? (
                   <NavLink to={item.href} end className={linkClass} aria-label={item.label} aria-describedby={tooltipId} data-menu-entry onClick={closeAfterAction}>
-                    <Icon size={23} strokeWidth={1.55} aria-hidden="true" />{badge}
+                    <Icon size={23} strokeWidth={1.55} aria-hidden="true" /><span className="floating-menu-label">{item.label}</span>{badge}
                   </NavLink>
                 ) : (
                   <button
@@ -102,7 +105,7 @@ export function FloatingMenu({ items }: { items: FloatingMenuItem[] }) {
                       if (item.panel) setActivePanel((active) => active === item.id ? null : item.id)
                       else { item.onClick?.(); closeAfterAction() }
                     }}
-                  ><Icon size={23} strokeWidth={1.55} aria-hidden="true" />{badge}</button>
+                  ><Icon size={23} strokeWidth={1.55} aria-hidden="true" /><span className="floating-menu-label">{item.label}</span>{badge}</button>
                 )}
                 <span className="floating-menu-tooltip" id={tooltipId} role="tooltip"><span>{item.label}</span>{item.shortcut && <kbd>{item.shortcut}</kbd>}</span>
                 {item.panel && expanded && <div className="floating-menu-panel" role="dialog" aria-label={item.label} onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); setActivePanel(null) } }}>{item.panel}</div>}
