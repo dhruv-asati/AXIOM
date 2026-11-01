@@ -25,7 +25,8 @@ const SPRITE_COLUMNS = 15
 const SPRITE_ROWS = 7
 const SPRITE_WIDTH = 3600 / SPRITE_COLUMNS
 const SPRITE_HEIGHT = 2268 / SPRITE_ROWS
-const MAX_DPR = 1.5
+const MAX_DPR = 1.25
+const TARGET_FRAME_MS = 1000 / 30
 const CROWD_DENSITY = 1.5
 const CROWD_LANES: CrowdLane[] = [
   { minHeight: 0.23, maxHeight: 0.29, minBaseline: 0.69, maxBaseline: 0.75 },
@@ -73,7 +74,7 @@ function createCrowd(width: number, height: number) {
         + randomBetween(-averageCharacterWidth * 0.08, averageCharacterWidth * 0.08)
       return createWalker(width, height, laneIndex, x)
     })
-  })
+  }).sort((a, b) => a.baselineRatio - b.baselineRatio)
 }
 
 export function CrowdCanvas() {
@@ -95,6 +96,7 @@ export function CrowdCanvas() {
     let height = window.innerHeight
     let dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR)
     let walkers: Walker[] = createCrowd(width, height)
+    let elapsedSinceRender = 0
     let disposed = false
     let tickerAttached = false
     const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)')
@@ -102,15 +104,18 @@ export function CrowdCanvas() {
     const image = new Image()
     image.src = '/images/peeps/all-peeps.png'
 
-    const render = (_time: number, deltaMs: number) => {
+    const render = (_time: number, deltaMs: number, frameOrForce: number | boolean = false) => {
       if (disposed || !image.complete || !image.naturalWidth || document.hidden) return
 
-      const delta = Math.min(deltaMs / 1000, 0.05)
+      const force = frameOrForce === true
+      elapsedSinceRender += deltaMs
+      if (!force && !reducedMotion && elapsedSinceRender < TARGET_FRAME_MS) return
+      const delta = reducedMotion ? 0 : Math.min(elapsedSinceRender / 1000, 0.05)
+      elapsedSinceRender = 0
       const now = performance.now() / 1000
       context.clearRect(0, 0, width, height)
       context.globalAlpha = 0.9
 
-      walkers.sort((a, b) => a.baselineRatio - b.baselineRatio)
       for (const walker of walkers) {
         if (!reducedMotion) walker.x += walker.speed * walker.direction * delta
         const characterHeight = height * walker.heightRatio
@@ -167,24 +172,25 @@ export function CrowdCanvas() {
           walkers.push(...Array.from({ length: missing }, () => createWalker(width, height, lane)))
         }
       }
-      render(0, 0)
+      walkers.sort((a, b) => a.baselineRatio - b.baselineRatio)
+      render(0, TARGET_FRAME_MS, true)
     }
 
     const onVisibilityChange = () => {
-      if (!document.hidden) render(0, 0)
+      if (!document.hidden) render(0, TARGET_FRAME_MS, true)
     }
     const onMotionPreferenceChange = (event: MediaQueryListEvent) => {
       reducedMotion = event.matches
       if (reducedMotion) {
         if (tickerAttached) gsap.ticker.remove(render)
         tickerAttached = false
-        render(0, 0)
+        render(0, TARGET_FRAME_MS, true)
       } else if (!tickerAttached) {
         gsap.ticker.add(render)
         tickerAttached = true
       }
     }
-    const onImageLoad = () => render(0, 0)
+    const onImageLoad = () => render(0, TARGET_FRAME_MS, true)
     const onImageError = () => container.classList.add('crowd-canvas-fallback')
 
     resize()
@@ -197,7 +203,7 @@ export function CrowdCanvas() {
       gsap.ticker.add(render)
       tickerAttached = true
     }
-    if (image.complete && image.naturalWidth) render(0, 0)
+    if (image.complete && image.naturalWidth) render(0, TARGET_FRAME_MS, true)
 
     return () => {
       disposed = true

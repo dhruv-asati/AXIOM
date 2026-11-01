@@ -1,4 +1,10 @@
 html {
+  --axiom-dark-base: #171d1a;
+  --axiom-dark-atmosphere:
+    radial-gradient(ellipse at 14% 20%, rgba(93, 126, 101, .25), transparent 35%),
+    radial-gradient(ellipse at 87% 35%, rgba(122, 99, 132, .22), transparent 34%),
+    radial-gradient(ellipse at 52% 92%, rgba(143, 113, 76, .2), transparent 38%),
+    linear-gradient(rgba(23, 29, 26, .48), rgba(23, 29, 26, .48));
   min-width: 320px;
   min-height: 100%;
   scroll-behavior: smooth;
@@ -8,6 +14,12 @@ body {
   min-width: 320px;
   min-height: 100vh;
   margin: 0;
+}
+
+html[data-theme="dark"],
+html[data-theme="dark"] body,
+html[data-theme="dark"] #root {
+  background-color: var(--axiom-dark-base);
 }
 
 #root {

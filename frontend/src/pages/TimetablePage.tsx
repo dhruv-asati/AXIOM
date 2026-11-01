@@ -134,6 +134,11 @@ export function TimetablePage() {
       .sort((a, b) => (dayIndex.get(a.day) ?? 99) - (dayIndex.get(b.day) ?? 99) || a.start_period - b.start_period || a.session_id.localeCompare(b.session_id))
       .map((row) => toDisplaySession(row, calendar))
   }, [assignments, calendar, filters])
+  const groupOptions = useMemo(() => {
+    const groups = new Map<string, string>()
+    assignments.forEach((row) => row.student_groups.forEach((group) => groups.set(group.id, group.name || group.id)))
+    return [...groups.entries()].sort((a, b) => a[1].localeCompare(b[1]))
+  }, [assignments])
 
   const periods = (calendar?.periods ?? []).slice().sort((a, b) => a.id - b.id)
   const days = calendar?.days ?? []
@@ -221,18 +226,18 @@ export function TimetablePage() {
         <label className="ops-field">Faculty<select value={filters.faculty_id} onChange={(event) => setFilters((state) => ({ ...state, faculty_id: event.target.value }))}><option value="">All faculty</option>{unique(assignments.map((row) => row.faculty_id)).map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
         <label className="ops-field">Room<select value={filters.room_id} onChange={(event) => setFilters((state) => ({ ...state, room_id: event.target.value }))}><option value="">All rooms</option>{unique(assignments.map((row) => row.room_id)).map((value) => <option key={value}>{value}</option>)}</select></label>
         <label className="ops-field">Course<select value={filters.course_id} onChange={(event) => setFilters((state) => ({ ...state, course_id: event.target.value }))}><option value="">All courses</option>{unique(assignments.map((row) => row.course_id)).map((value) => <option key={value}>{value}</option>)}</select></label>
-        <label className="ops-field">Student group<select value={filters.group_id} onChange={(event) => setFilters((state) => ({ ...state, group_id: event.target.value }))}><option value="">All groups</option>{unique(assignments.flatMap((row) => row.student_groups.map((group) => group.id))).map((value) => <option key={value}>{value}</option>)}</select></label>
+        <label className="ops-field">Student group<select value={filters.group_id} onChange={(event) => setFilters((state) => ({ ...state, group_id: event.target.value }))}><option value="">All groups</option>{groupOptions.map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></label>
         <span className="ops-badge">{displaySessions.length} of {assignments.length} sessions</span>
       </section>
       {calendar && <section className="ops-card academic-timetable-card">
-        <div className="ops-card-heading academic-grid-heading"><div><h2>Weekly schedule</h2><p>{selectedDataset?.source_dataset_id ?? 'Selected dataset'} · Recurring campus timetable · {weekRange}</p><p className="academic-color-key">Course colors stay consistent; session type is labeled on every block. Select a block for full details.</p></div><span className="ops-badge good">{schedules.find((row) => row.schedule_id === scheduleId)?.status ?? 'unknown'}</span></div>
+        <div className="ops-card-heading academic-grid-heading"><div><h2>Weekly schedule</h2><p>{selectedDataset?.source_dataset_id ?? 'Selected dataset'} · Recurring campus timetable · {weekRange}</p><p className="academic-color-key">Each row is one period. Cards across a row are parallel classes for separate groups and rooms. Use the Student group filter to follow one cohort; select a card for full details.</p></div><span className="ops-badge good">{schedules.find((row) => row.schedule_id === scheduleId)?.status ?? 'unknown'}</span></div>
         {assignments.length === 0 ? <div className="ops-empty"><CalendarDays size={18} /><strong>This schedule has no assignments</strong><span>No timetable rows were returned by the backend.</span></div> : <div className="academic-grid-scroll" role="region" aria-label="Weekly timetable grid. Scroll to see every day and period." tabIndex={0}><div className="academic-week-grid" style={gridStyle}>
           <div className="academic-time-heading">PERIOD <span>TIME</span></div>
           <div className="academic-day-headings" style={{ gridTemplateColumns: dayColumnsTemplate }}>
             {days.map((day, index) => {
               const date = addLocalDays(weekStart, index)
               return <div className={`academic-day-heading${day === todayDay ? ' is-today' : ''}`} key={day}>
-                <span>{day}</span><strong>{new Intl.DateTimeFormat('en-IN', { day: '2-digit' }).format(date)}</strong><small>{new Intl.DateTimeFormat('en-IN', { month: 'short' }).format(date)}</small>{day === todayDay && <em>Today</em>}
+                <span>{new Intl.DateTimeFormat('en-IN', { weekday: 'long' }).format(date)}</span><strong>{new Intl.DateTimeFormat('en-IN', { day: '2-digit' }).format(date)}</strong><small>{new Intl.DateTimeFormat('en-IN', { month: 'short' }).format(date)}</small>{day === todayDay && <em>Today</em>}
               </div>
             })}
           </div>
@@ -253,13 +258,13 @@ export function TimetablePage() {
                   data-tone={courseTone(session.courseCode)}
                   style={{ gridRow: `${startRow} / span ${rowSpan}`, gridColumn: lane + 1 }}
                   aria-label={`${session.courseName}, ${session.courseCode}, ${sessionKindLabel(session.kind)}, ${session.facultyName}, ${session.roomName}, ${session.timeLabel}, ${session.studentGroups.map((group) => group.name || group.id).join(', ')}`}
-                  title={`${session.courseName} · ${session.timeLabel}`}
+                  title={`${session.courseName} · ${session.day} ${session.timeLabel} · Groups: ${session.studentGroups.map((group) => group.name || group.id).join(', ') || 'Unassigned'} · ${session.roomName}`}
                   onClick={() => setSelected(session)}
                 >
                   <span className="academic-session-identifiers"><span className="academic-session-type">{sessionKindLabel(session.kind)}</span><span className="academic-session-code">{session.courseCode}</span></span>
                   <strong className="academic-session-course">{session.courseName || session.courseCode}</strong>
                   <span className="academic-session-meta"><Users size={11} aria-hidden="true" />{session.facultyName}<MapPin size={11} aria-hidden="true" />{session.roomName}</span>
-                  <span className="academic-session-groups">{session.studentGroups.map((group) => group.name || group.id).join(' · ')}</span>
+                  <span className="academic-session-groups"><b>GROUP</b><span>{session.studentGroups.map((group) => group.name || group.id).join(' · ') || 'Unassigned'}</span></span>
                 </button>)}
               </div>
             })}

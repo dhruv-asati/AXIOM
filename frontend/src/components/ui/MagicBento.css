@@ -20,6 +20,26 @@
   --bento-focus: #56616c;
 }
 
+/* Gentle color atmosphere sits between the monochrome crowd and readable cards. */
+.application-shell::before {
+  position: fixed;
+  z-index: 0;
+  inset: -4%;
+  background:
+    radial-gradient(ellipse at 14% 20%, rgba(157, 177, 157, .27), transparent 34%),
+    radial-gradient(ellipse at 86% 36%, rgba(184, 163, 184, .23), transparent 32%),
+    radial-gradient(ellipse at 53% 92%, rgba(195, 172, 133, .22), transparent 38%);
+  content: '';
+  pointer-events: none;
+  will-change: transform;
+  animation: axiom-ambient-drift 34s ease-in-out infinite alternate;
+}
+
+@keyframes axiom-ambient-drift {
+  from { transform: translate3d(-1%, -1%, 0) scale(1); }
+  to { transform: translate3d(1%, 1%, 0) scale(1.025); }
+}
+
 .application-shell .content-container .ops-card,
 .application-shell .content-container .ops-record-card,
 .application-shell .content-container .ops-stat,
@@ -132,6 +152,15 @@
 .application-shell .content-container .rooms-page .ops-record-card .ops-field { color: #59646e; }
 .application-shell .content-container .rooms-page .ops-record-card .ops-field input { border-color: #d7dce0; color: #35404a; background: #fff; }
 .application-shell .content-container .rooms-page .ops-record-card .ops-button { border-color: #d4d9dd; color: #fff; background: #424c56; }
+.application-shell .content-container .rooms-page .ops-record-card.room-accent-sage { --room-accent: #829989; --room-wash: #f0f4f0; }
+.application-shell .content-container .rooms-page .ops-record-card.room-accent-stone { --room-accent: #a48d69; --room-wash: #f5f2ec; }
+.application-shell .content-container .rooms-page .ops-record-card.room-accent-mauve { --room-accent: #92859b; --room-wash: #f3f0f4; }
+.application-shell .content-container .rooms-page .ops-record-card.room-accent-warm { --room-accent: #a88a73; --room-wash: #f6f1ed; }
+.application-shell .content-container .rooms-page .ops-record-card.room-accent-slate { --room-accent: #74838a; --room-wash: #f0f3f4; }
+.application-shell .content-container .rooms-page .ops-record-card[class*="room-accent-"] {
+  border-top: 3px solid var(--room-accent);
+  background: linear-gradient(145deg, rgba(255,255,255,.98), var(--room-wash));
+}
 .application-shell .content-container .ops-empty { border-style: dashed; background: rgba(255,255,255,.76); box-shadow: none; }
 .application-shell .content-container .ops-message { background: #f8f9f9; }
 .application-shell .content-container .ops-message.error { border-color: #ecd9d4; color: #925f52; background: #fff9f7; }
@@ -374,6 +403,7 @@
   .application-shell .content-container .ops-stat { box-shadow: 0 5px 16px rgba(32,40,49,.055); }
 }
 @media (prefers-reduced-motion: reduce) {
+  .application-shell::before { animation: none; }
   .magic-bento, .application-shell .content-container .ops-card,
   .application-shell .content-container .ops-record-card,
   .application-shell .content-container .ops-stat { transition: none; }

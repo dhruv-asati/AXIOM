@@ -14,6 +14,7 @@ export type FloatingMenuItem = {
   onClick?: () => void
   badge?: string | number | boolean
   shortcut?: string
+  pressed?: boolean
   panel?: ReactNode
   tone?: 'default' | 'danger'
 }
@@ -89,10 +90,11 @@ export function FloatingMenu({ items }: { items: FloatingMenuItem[] }) {
                   </NavLink>
                 ) : (
                   <button
-                    className={`floating-menu-button${expanded ? ' is-active' : ''}${item.tone === 'danger' ? ' is-danger' : ''}`}
+                    className={`floating-menu-button${expanded ? ' is-active' : ''}${item.pressed ? ' is-pressed' : ''}${item.tone === 'danger' ? ' is-danger' : ''}`}
                     type="button"
                     aria-label={item.label}
                     aria-describedby={tooltipId}
+                    aria-pressed={item.pressed}
                     aria-haspopup={item.panel ? 'dialog' : undefined}
                     aria-expanded={item.panel ? expanded : undefined}
                     data-menu-entry

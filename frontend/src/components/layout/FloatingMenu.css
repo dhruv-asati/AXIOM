@@ -39,10 +39,11 @@
 }
 .floating-menu-button svg { width: clamp(17px, calc(var(--floating-item-size) * .52), 23px); height: clamp(17px, calc(var(--floating-item-size) * .52), 23px); }
 .floating-menu-button:hover, .floating-menu-button:focus-visible, .floating-menu-entry.is-expanded .floating-menu-button { background: rgba(255,255,255,.16); transform: scale(1.04); }
-.floating-menu-button.is-active { color: #fff; background: #5273d8; box-shadow: 0 0 0 2px rgba(255,255,255,.16), 0 3px 10px rgba(82,115,216,.38); }
+.floating-menu-button.is-active { color: #fff; background: #718779; box-shadow: 0 0 0 2px rgba(255,255,255,.16), 0 3px 10px rgba(102,126,109,.34); }
+.floating-menu-button.is-pressed { color: #fff; background: #637969; box-shadow: inset 0 0 0 1px rgba(225,238,226,.24); }
 .floating-menu-button.is-danger:hover { color: #ffaaa5; }
-.floating-menu-button:focus-visible, .floating-menu-mobile-toggle:focus-visible { outline: 2px solid #93b4ff; outline-offset: 2px; }
-.floating-menu-badge { position: absolute; top: 5px; right: 5px; display: grid; min-width: 9px; height: 9px; place-items: center; padding: 0 2px; border: 1.5px solid #000; border-radius: 999px; color: #fff; background: #3b82f6; font-size: 8px; line-height: 1; }
+.floating-menu-button:focus-visible, .floating-menu-mobile-toggle:focus-visible { outline: 2px solid #b5c4b8; outline-offset: 2px; }
+.floating-menu-badge { position: absolute; top: 5px; right: 5px; display: grid; min-width: 9px; height: 9px; place-items: center; padding: 0 2px; border: 1.5px solid #000; border-radius: 999px; color: #fff; background: #9c8c66; font-size: 8px; line-height: 1; }
 .floating-menu-tooltip { position: absolute; z-index: 3; top: 50%; right: calc(100% + 11px); display: flex; align-items: center; gap: 9px; width: max-content; max-width: min(240px, calc(100vw - 100px)); padding: 8px 10px; border: 1px solid rgba(255,255,255,.1); border-radius: 7px; color: #fff; background: #080a0d; box-shadow: 0 6px 18px rgba(0,0,0,.2); font-size: 11px; font-weight: 550; line-height: 1.25; white-space: nowrap; opacity: 0; pointer-events: none; transform: translate(6px, -50%); transition: opacity .12s ease, transform .12s ease; }
 .floating-menu-entry:hover .floating-menu-tooltip, .floating-menu-button:focus-visible ~ .floating-menu-tooltip { opacity: 1; transform: translate(0, -50%); }
 .floating-menu-tooltip kbd { min-width: 18px; padding: 2px 4px; border: 1px solid rgba(255,255,255,.25); border-radius: 4px; color: #d7dce3; font: inherit; font-size: 9px; text-align: center; }

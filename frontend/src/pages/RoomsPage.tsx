@@ -13,6 +13,15 @@ import { SmoothInput } from '../components/ui/SmoothInput'
 import { WheelTimePicker } from '../components/WheelTimePicker'
 import { periodClockSlots, periodClockTime, periodForClockTime } from '../lib/timeSlots'
 
+function roomAccentClass(roomType: string) {
+  const normalized = roomType.toLowerCase()
+  if (normalized.includes('lab')) return 'room-accent-sage'
+  if (normalized.includes('workshop')) return 'room-accent-stone'
+  if (normalized.includes('hall') || normalized.includes('lecture')) return 'room-accent-mauve'
+  if (normalized.includes('meeting') || normalized.includes('conference')) return 'room-accent-warm'
+  return 'room-accent-slate'
+}
+
 export function RoomsPage() {
   const { user } = useAuth()
   const { selectedDatasetId } = useDatasetContext()
@@ -104,7 +113,7 @@ export function RoomsPage() {
     {loading && loadedDatasetId !== selectedDatasetId && <SkeletonPage label="Loading rooms"><div className="ops-card-grid">{Array.from({ length: 6 }, (_, index) => <SkeletonCard key={index} />)}</div></SkeletonPage>}
     {loading && loadedDatasetId === selectedDatasetId && <span className="skeleton-refresh" role="status"><span className="axiom-skeleton" />Refreshing room records…</span>}
     {!loading && !error && loadedDatasetId === selectedDatasetId && rooms.length === 0 && <div className="ops-empty"><DoorOpen size={20} /><strong>No rooms match</strong><span>Import a dataset or adjust the filters.</span></div>}
-    {loadedDatasetId === selectedDatasetId && rooms.length > 0 && <div className="ops-card-grid">{rooms.map((room) => <article className="ops-record-card" key={room.room_id}>
+    {loadedDatasetId === selectedDatasetId && rooms.length > 0 && <div className="ops-card-grid">{rooms.map((room) => <article className={`ops-record-card ${roomAccentClass(room.room_type)}`} key={room.room_id}>
       <header><h3>{room.name}</h3><span className={`ops-badge ${room.availability === 'available' ? 'good' : room.availability === 'unavailable' || room.availability === 'occupied' ? 'warn' : ''}`}>{room.availability.replace('_', ' ')}</span></header>
       <p>{room.room_type} · {room.building}</p>
       <div className="ops-detail-grid"><div className="ops-detail"><span>Capacity</span><strong>{room.capacity}</strong></div><div className="ops-detail"><span>Accessible</span><strong>{room.accessible ? 'Yes' : 'No'}</strong></div><div className="ops-detail"><span>Scheduled teaching periods</span><strong>{room.scheduled_periods}</strong></div><div className="ops-detail"><span>Unavailable periods</span><strong>{room.unavailable_periods}</strong></div><div className="ops-detail"><span>Utilisation</span><strong>{room.utilization_percent === null ? 'No schedule' : `${room.utilization_percent}%`}</strong></div></div>

@@ -5,6 +5,7 @@ import { AuthenticatedCanvasLayout } from './components/layout/AuthenticatedCanv
 import { DatasetProvider } from './context/DatasetContext'
 import { SkeletonCard, SkeletonPage, SkeletonStats } from './components/ui/Skeleton'
 import { AuthProvider } from './auth/AuthContext'
+import { ThemeProvider } from './context/ThemeContext'
 import { ProtectedRoute } from './auth/ProtectedRoute'
 import { ROUTE_ROLES } from './auth/roleAccess.mjs'
 import { LandingPage } from './pages/LandingPage'
@@ -32,7 +33,7 @@ function ForbiddenPage() {
 }
 
 function App() {
-  return <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><AuthProvider><Routes>
+  return <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><AuthProvider><ThemeProvider><Routes>
     <Route path="/" element={<LandingPage />} />
     <Route path="/login" element={<LoginPage />} />
     <Route element={<ProtectedRoute />}>
@@ -54,7 +55,7 @@ function App() {
       </Route>
     </Route>
     <Route path="*" element={<Navigate to="/" replace />} />
-  </Routes></AuthProvider></BrowserRouter>
+  </Routes></ThemeProvider></AuthProvider></BrowserRouter>
 }
 
 export default App

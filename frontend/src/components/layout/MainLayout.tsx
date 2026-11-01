@@ -1,6 +1,5 @@
-import { useRef } from 'react'
-import { useState } from 'react'
-import { CircleUserRound, Layers3, LogOut } from 'lucide-react'
+import { useRef, useState } from 'react'
+import { CircleUserRound, Layers3, LogOut, Moon, Sun } from 'lucide-react'
 import { useNavigate, Outlet } from 'react-router-dom'
 import { roleLabel, useAuth } from '../../auth/AuthContext'
 import { useDatasetContext } from '../../context/DatasetContext'
@@ -8,11 +7,14 @@ import { FloatingMenu, FloatingMenuPanel, type FloatingMenuItem } from './Floati
 import { getNavigationForRole } from './navigation'
 import { SpecularEffectsLayer } from '../ui/SpecularEffectsLayer'
 import { clearAssistantMemorySession } from '../../lib/assistantMemory.mjs'
+import { useTheme } from '../../context/ThemeContext'
 import '../ui/MagicBento.css'
+import '../ui/DarkTheme.css'
 
 export function MainLayout() {
   const { user, signOut } = useAuth()
   const shellRef = useRef<HTMLDivElement>(null)
+  const { theme, toggleTheme } = useTheme()
   const { datasets, selectedDatasetId, selectDataset, loading: datasetsLoading, error: datasetsError } = useDatasetContext()
   const navigate = useNavigate()
   const [logoutError, setLogoutError] = useState('')
@@ -36,6 +38,10 @@ export function MainLayout() {
   })) : []
   const items: FloatingMenuItem[] = [
     ...roleItems,
+    {
+      id: 'theme', label: theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode',
+      icon: theme === 'dark' ? Sun : Moon, pressed: theme === 'dark', onClick: toggleTheme,
+    },
     {
       id: 'dataset', label: 'Active dataset', icon: Layers3,
       panel: <FloatingMenuPanel title="Active dataset">
@@ -62,7 +68,7 @@ export function MainLayout() {
     { id: 'sign-out', label: 'Sign out', icon: LogOut, tone: 'danger', onClick: () => void handleSignOut() },
   ]
   return (
-    <div className="application-shell" ref={shellRef}>
+    <div className="application-shell" data-theme={theme} ref={shellRef}>
       <SpecularEffectsLayer rootRef={shellRef} />
       <FloatingMenu items={items} />
       <main className="main-content" id="main-content">

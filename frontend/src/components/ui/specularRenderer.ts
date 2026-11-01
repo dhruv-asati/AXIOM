@@ -25,6 +25,7 @@ let uniformLocations: Uniforms = {}
 let intersectionObserver: IntersectionObserver | null = null
 let resizeObserver: ResizeObserver | null = null
 let animationFrame = 0
+let fallbackPointerFrame = 0
 let pixelRatio = 1
 let pointerX = -10000
 let pointerY = -10000
@@ -155,6 +156,9 @@ function render() {
     const distance = rectDistance(pointerX, pointerY, rect)
     const shineSize = options.shineSize ?? (options.kind === 'button' ? 145 : 190)
     const proximity = Math.max(0, 1 - distance / shineSize)
+    record.element.style.setProperty('--specular-x', `${Math.min(100, Math.max(0, (pointerX - rect.left) / Math.max(1, rect.width) * 100))}%`)
+    record.element.style.setProperty('--specular-y', `${Math.min(100, Math.max(0, (pointerY - rect.top) / Math.max(1, rect.height) * 100))}%`)
+    record.element.dataset.specularNear = proximity > 0 ? 'true' : 'false'
     const localX = (pointerX - rect.left) * pixelRatio
     const localY = (rect.bottom - pointerY) * pixelRatio
     const radius = options.radius ?? (Number.parseFloat(getComputedStyle(record.element).borderTopLeftRadius) || 10)
@@ -184,13 +188,19 @@ function onPointerMove(event: PointerEvent) {
   if (event.pointerType === 'touch') return
   pointerX = event.clientX
   pointerY = event.clientY
-  for (const record of surfaces.values()) {
-    const rect = record.element.getBoundingClientRect()
-    const distance = rectDistance(pointerX, pointerY, rect)
-    const near = distance <= (record.options.shineSize ?? 190)
-    record.element.style.setProperty('--specular-x', `${Math.min(100, Math.max(0, (pointerX - rect.left) / Math.max(1, rect.width) * 100))}%`)
-    record.element.style.setProperty('--specular-y', `${Math.min(100, Math.max(0, (pointerY - rect.top) / Math.max(1, rect.height) * 100))}%`)
-    record.element.dataset.specularNear = near ? 'true' : 'false'
+  if (!context && !fallbackPointerFrame) {
+    fallbackPointerFrame = window.requestAnimationFrame(() => {
+      fallbackPointerFrame = 0
+      if (context || document.hidden) return
+      for (const record of surfaces.values()) {
+        const rect = record.element.getBoundingClientRect()
+        const distance = rectDistance(pointerX, pointerY, rect)
+        const near = distance <= (record.options.shineSize ?? 190)
+        record.element.style.setProperty('--specular-x', `${Math.min(100, Math.max(0, (pointerX - rect.left) / Math.max(1, rect.width) * 100))}%`)
+        record.element.style.setProperty('--specular-y', `${Math.min(100, Math.max(0, (pointerY - rect.top) / Math.max(1, rect.height) * 100))}%`)
+        record.element.dataset.specularNear = near ? 'true' : 'false'
+      }
+    })
   }
   requestRender()
 }
@@ -250,6 +260,8 @@ function stopObservers() {
 function releaseRenderer() {
   if (animationFrame) cancelAnimationFrame(animationFrame)
   animationFrame = 0
+  if (fallbackPointerFrame) cancelAnimationFrame(fallbackPointerFrame)
+  fallbackPointerFrame = 0
   stopObservers()
   document.removeEventListener('pointermove', onPointerMove)
   document.removeEventListener('visibilitychange', onVisibilityChange)
@@ -275,6 +287,8 @@ function activateCssFallback() {
   const canvas = canvasElement
   if (animationFrame) cancelAnimationFrame(animationFrame)
   animationFrame = 0
+  if (fallbackPointerFrame) cancelAnimationFrame(fallbackPointerFrame)
+  fallbackPointerFrame = 0
   stopObservers()
   document.removeEventListener('visibilitychange', onVisibilityChange)
   window.removeEventListener('resize', onWindowResize)
@@ -307,7 +321,7 @@ function initializeRenderer(canvas: HTMLCanvasElement) {
   canvas.addEventListener('webglcontextlost', onWebGLContextLost)
   canvas.addEventListener('webglcontextrestored', onWebGLContextRestored)
   document.addEventListener('pointermove', onPointerMove, { passive: true })
-  const gl = canvas.getContext('webgl2', { alpha: true, antialias: false, depth: false, stencil: false, preserveDrawingBuffer: true })
+  const gl = canvas.getContext('webgl2', { alpha: true, antialias: false, depth: false, stencil: false })
   if (!gl) {
     canvas.style.visibility = 'hidden'
     for (const record of surfaces.values()) markFallback(record, true)
