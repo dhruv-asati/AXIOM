@@ -320,7 +320,7 @@ def test_repair_service_rejects_self_approval_and_database_check_is_present(auth
         db.add(proposal); db.commit()
         with pytest.raises(RepairError, match="cannot approve their own"):
             approve_repair_proposal(db, dataset_id, schedule.id, proposal.id, decided_by_user_id=ids["admin"])
-        proposal.status = "rejected"
+        proposal.status = "approved"
         proposal.decided_by_user_id = ids["admin"]
         with pytest.raises(IntegrityError):
             db.commit()

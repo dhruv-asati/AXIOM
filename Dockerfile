@@ -29,4 +29,4 @@ COPY --from=frontend-build /build/frontend/dist/ /app/frontend/dist/
 
 USER 10001:10001
 EXPOSE 10000
-CMD ["sh", "-c", "python -m uvicorn app.main:app --app-dir /app/backend --host 0.0.0.0 --port ${PORT:-10000}"]
+CMD ["sh", "-c", "cd /app/backend && alembic upgrade head && python -m uvicorn app.main:app --app-dir /app/backend --host 0.0.0.0 --port ${PORT:-10000}"]

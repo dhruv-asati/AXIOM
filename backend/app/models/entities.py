@@ -397,7 +397,7 @@ class ScheduleRepairProposal(Base):
         ForeignKeyConstraint(["created_by_user_id"], ["users.id"], ondelete="SET NULL", name="fk_repair_proposals_created_by_user"),
         ForeignKeyConstraint(["decided_by_user_id"], ["users.id"], ondelete="SET NULL", name="fk_repair_proposals_decided_by_user"),
         CheckConstraint("status IN ('proposed', 'approved', 'rejected')", name="ck_repair_proposal_status"),
-        CheckConstraint("decided_by_user_id IS NULL OR created_by_user_id IS NULL OR decided_by_user_id <> created_by_user_id", name="ck_repair_proposal_no_self_approval"),
+        CheckConstraint("status <> 'approved' OR decided_by_user_id IS NULL OR created_by_user_id IS NULL OR decided_by_user_id <> created_by_user_id", name="ck_repair_proposal_no_self_approval"),
         UniqueConstraint("id", "dataset_id", name="uq_repair_proposals_id_dataset"),
         Index("ix_repair_proposals_dataset_created", "dataset_id", "created_at"),
         Index("ix_repair_proposals_baseline_status", "baseline_schedule_id", "status"),

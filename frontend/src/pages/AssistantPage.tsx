@@ -17,6 +17,34 @@ import { getAssistantAutocompleteSuggestions } from '../components/assistant/ass
 import { AssistantMemoryPanel } from '../components/assistant/AssistantMemoryPanel'
 import { useAssistantMemory } from '../hooks/useAssistantMemory'
 
+function readableChange(change: Record<string, unknown>): string {
+  const dayNames: Record<string, string> = { MON: 'Monday', TUE: 'Tuesday', WED: 'Wednesday', THU: 'Thursday', FRI: 'Friday' }
+  const days = Array.isArray(change.days) ? change.days.map(String).map((day) => dayNames[day] ?? day).join(', ') : ''
+  const periods = Array.isArray(change.periods) ? change.periods.map(String).join(', ') : ''
+  const when = [days, periods && `periods ${periods}`].filter(Boolean).join(' · ')
+  if (change.type === 'room_unavailable') return `Room ${String(change.room_id ?? '—')} unavailable${when ? ` · ${when}` : ''}${change.reason ? ` · Reason: ${String(change.reason)}` : ''}`
+  if (change.type === 'faculty_unavailable') return `Faculty ${String(change.faculty_id ?? '—')} unavailable${when ? ` · ${when}` : ''}${change.reason ? ` · Reason: ${String(change.reason)}` : ''}`
+  if (change.type === 'remove_session') return `Remove session ${String(change.session_id ?? '—')}`
+  if (change.type === 'add_session') return `Add session ${String((change.session as Record<string, unknown> | undefined)?.id ?? '')}`.trim()
+  if (change.type === 'add_faculty') return `Add faculty ${String((change.faculty as Record<string, unknown> | undefined)?.name ?? (change.faculty as Record<string, unknown> | undefined)?.id ?? '')}`.trim()
+  return 'Timetable change'
+}
+
+function readableValue(value: unknown): string {
+  if (Array.isArray(value)) return value.map((item) => typeof item === 'object' && item !== null
+    ? Object.entries(item).map(([key, part]) => `${key.replaceAll('_', ' ')} ${String(part)}`).join(', ')
+    : String(item)).join('; ')
+  if (typeof value === 'object' && value !== null) return Object.entries(value).map(([key, part]) => `${key.replaceAll('_', ' ')} ${String(part)}`).join(', ')
+  return String(value)
+}
+
+const bookingFieldNames: Record<string, string> = {
+  requester: 'Requester', role: 'Role', department: 'Department', requested_category: 'Request type',
+  title: 'Event', attendance: 'Expected attendance', duration_periods: 'Duration', windows: 'Preferred time',
+  room_types: 'Room type', needs: 'Room requirements', requested_room: 'Preferred room',
+  mandatory_for_groups: 'Required groups', series_id: 'Series',
+}
+
 export function AssistantPage() {
   const { selectedDatasetId } = useDatasetContext()
   const { user } = useAuth()
@@ -234,7 +262,8 @@ export function AssistantPage() {
       {result.missing_fields.length > 0 && <div className="ops-callout">More information needed: {result.missing_fields.join(', ')}{result.clarification?.question ? ` — ${result.clarification.question}` : ''}</div>}
       {result.assumptions.length > 0 && <p className="ops-inline-note">Assumptions: {result.assumptions.join('; ')}</p>}
       {result.warnings.map((warning) => <div className="ops-message" key={warning.code}>{warning.message}</div>)}
-      {result.proposal && <pre className="ops-json">{JSON.stringify(result.proposal.data, null, 2)}</pre>}
+      {result.proposal?.type === 'disruption' && Array.isArray(result.proposal.data.changes) && <div className="disruption-proposal-section"><h4>Interpretation</h4><ul className="disruption-change-list">{result.proposal.data.changes.filter((change): change is Record<string, unknown> => !!change && typeof change === 'object').map((change, index) => <li key={index}>{readableChange(change)}</li>)}</ul></div>}
+      {result.proposal?.type === 'booking' && <div className="disruption-proposal-section"><h4>Booking request</h4><ul className="disruption-change-list">{Object.entries(result.proposal.data).filter(([key, value]) => bookingFieldNames[key] && value !== null && value !== undefined && value !== '').map(([key, value]) => <li key={key}><strong>{bookingFieldNames[key]}:</strong> {key === 'duration_periods' ? `${String(value)} periods` : readableValue(value)}</li>)}</ul></div>}
       {result.proposal?.type === 'booking' && <button className="ops-button primary" type="button" disabled={loading || !selectedDatasetId} onClick={() => void acceptBooking()}>Submit booking request</button>}
       {result.proposal?.type === 'disruption' && <p className="ops-inline-note">Open Disruptions to select a baseline schedule and create a repair preview from this structured change.</p>}
     </section>}

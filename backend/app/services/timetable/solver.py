@@ -532,6 +532,10 @@ def _build_and_solve(
     solver.parameters.max_time_in_seconds = max(1.0, float(time_limit_seconds))
     solver.parameters.num_search_workers = 1
     solver.parameters.random_seed = 0
+    # A repair only needs a hard-constraint-feasible proposal for human review.
+    # Stop once CP-SAT finds one instead of spending the full time budget
+    # proving that no better objective value exists.
+    solver.parameters.stop_after_first_solution = repair_mode
     if hint_assignments:
         for key, variable in session_y.items():
             session_id, day, start = key

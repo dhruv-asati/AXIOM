@@ -1315,12 +1315,19 @@ def approve_repair_proposal_endpoint(dataset_id: UUID, schedule_id: UUID, propos
 @router.post(
     "/datasets/{dataset_id}/schedules/{schedule_id}/repair-proposals/{proposal_id}/reject",
     tags=["disruptions"], response_model=RepairProposalResponse,
-    dependencies=_admin_only(),
+    dependencies=_role_access("admin", "department_coordinator", "faculty"),
     responses={404: {"model": ErrorResponse}, 409: {"model": ErrorResponse}, 422: {"model": ErrorResponse}},
 )
 def reject_repair_proposal_endpoint(dataset_id: UUID, schedule_id: UUID, proposal_id: UUID, body: RepairRejectRequest, db: Session = Depends(get_db), user: User = Depends(current_user)):
     if db.scalar(select(BookingClassMoveProposal.id).where(BookingClassMoveProposal.dataset_id == dataset_id, BookingClassMoveProposal.repair_proposal_id == proposal_id)):
         raise HTTPException(status_code=409, detail="Use the booking class-move decision workflow for this proposal")
+    created_by_user_id = db.scalar(select(ScheduleRepairProposal.created_by_user_id).where(
+        ScheduleRepairProposal.id == proposal_id,
+        ScheduleRepairProposal.dataset_id == dataset_id,
+        ScheduleRepairProposal.baseline_schedule_id == schedule_id,
+    ))
+    if user.role != "admin" and created_by_user_id != user.id:
+        raise HTTPException(status_code=403, detail="You can reject only your own repair proposals")
     try:
         return reject_repair_proposal(db, dataset_id, schedule_id, proposal_id, body.reason, decided_by_user_id=user.id)
     except LookupError as exc:

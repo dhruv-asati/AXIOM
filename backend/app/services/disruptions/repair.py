@@ -586,8 +586,6 @@ def reject_repair_proposal(
             raise LookupError("Repair proposal not found for this dataset and baseline schedule")
         if proposal.status != "proposed":
             raise RepairError(f"Repair proposal is already {proposal.status}")
-        if decided_by_user_id is not None and proposal.created_by_user_id == decided_by_user_id:
-            raise RepairError("A user cannot decide their own repair proposal")
         proposal.status = "rejected"
         proposal.explanation = f"{proposal.explanation} Rejected: {reason.strip()}"
         proposal.decided_at = datetime.now(timezone.utc)
