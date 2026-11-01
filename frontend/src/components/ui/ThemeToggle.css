@@ -1,0 +1,31 @@
+.axiom-theme-toggle { display: inline-flex; align-items: center; justify-content: center; gap: 9px; min-height: 42px; padding: 0 14px; border: 1px solid rgba(103,119,105,.24); border-radius: 999px; color: #3c493f; background: rgba(255,255,255,.78); box-shadow: 0 8px 22px rgba(33,43,35,.1); cursor: pointer; font: inherit; font-weight: 650; transition: color .2s ease, background .2s ease, border-color .2s ease, box-shadow .2s ease, transform .2s ease; }
+.axiom-theme-toggle:hover { border-color: rgba(103,130,108,.5); background: rgba(255,255,255,.96); box-shadow: 0 10px 25px rgba(33,43,35,.16); transform: translateY(-1px); }
+.axiom-theme-toggle:focus-visible { outline: 3px solid rgba(112,143,118,.45); outline-offset: 3px; }
+.axiom-theme-toggle-icon { display: grid; width: 22px; height: 22px; place-items: center; }
+.axiom-theme-toggle-icon svg { animation: axiom-theme-icon-in .32s cubic-bezier(.2,.75,.25,1) both; }
+.axiom-theme-toggle.is-compact { box-sizing: border-box; width: var(--floating-item-size, 44px); min-width: var(--floating-item-size, 44px); height: var(--floating-item-size, 44px); min-height: var(--floating-item-size, 44px); padding: 0; border-radius: 50%; color: inherit; background: transparent; box-shadow: none; }
+.axiom-theme-toggle.is-compact:hover { background: rgba(139,160,142,.2); box-shadow: none; transform: none; }
+.application-shell[data-theme="dark"] .axiom-theme-toggle:not(.is-compact), .landing-showcase[data-theme="dark"] .axiom-theme-toggle:not(.is-compact) { border-color: rgba(193,208,196,.24); color: #e9eee9; background: rgba(31,39,34,.84); }
+.application-shell[data-theme="dark"] .axiom-theme-toggle:not(.is-compact):hover, .landing-showcase[data-theme="dark"] .axiom-theme-toggle:not(.is-compact):hover { border-color: rgba(169,190,173,.54); background: rgba(48,59,51,.94); }
+.theme-transition-gif-overlay { position: fixed; z-index: 2147483000; inset: 0; pointer-events: none; background-position: center; background-size: cover; animation: axiom-gif-transition .7s ease-out both; }
+
+@keyframes axiom-theme-icon-in { from { opacity: .25; transform: rotate(-30deg) scale(.72); } to { opacity: 1; transform: rotate(0) scale(1); } }
+@keyframes axiom-gif-transition { 0% { opacity: 0; } 22% { opacity: .58; } 75% { opacity: .45; } 100% { opacity: 0; } }
+
+@supports (view-transition-name: root) {
+  html::view-transition-old(root) { animation: none; z-index: 0; }
+  html::view-transition-new(root) { animation-duration: .58s; animation-timing-function: cubic-bezier(.2,.72,.18,1); z-index: 1; }
+  html[data-theme-animation="circle"]::view-transition-new(root), html[data-theme-animation="gif"]::view-transition-new(root) { clip-path: circle(0 at var(--theme-transition-x, 50%) var(--theme-transition-y, 50%)); animation-name: axiom-theme-circle; }
+  html[data-theme-animation="circle-blur"]::view-transition-new(root) { clip-path: circle(0 at var(--theme-transition-x, 50%) var(--theme-transition-y, 50%)); filter: blur(8px); animation-name: axiom-theme-circle-blur; }
+  html[data-theme-animation="rectangle"]::view-transition-new(root) { clip-path: inset(0 round 0); transform: scale(.01); transform-origin: var(--theme-transition-origin, 50% 50%); animation-name: axiom-theme-rectangle; }
+  html[data-theme-animation="polygon"]::view-transition-new(root) { clip-path: polygon(50% 50%,50% 50%,50% 50%,50% 50%,50% 50%,50% 50%); animation-name: axiom-theme-polygon; }
+  @keyframes axiom-theme-circle { to { clip-path: circle(150vmax at var(--theme-transition-x, 50%) var(--theme-transition-y, 50%)); } }
+  @keyframes axiom-theme-circle-blur { 45% { filter: blur(2px); } to { clip-path: circle(150vmax at var(--theme-transition-x, 50%) var(--theme-transition-y, 50%)); filter: blur(0); } }
+  @keyframes axiom-theme-rectangle { to { transform: scale(1); } }
+  @keyframes axiom-theme-polygon { to { clip-path: polygon(0 0,100% 0,100% 100%,0 100%,0 0,0 0); } }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .axiom-theme-toggle, .axiom-theme-toggle-icon svg { animation: none !important; transition-duration: .01ms !important; }
+  .theme-transition-gif-overlay { display: none; }
+}

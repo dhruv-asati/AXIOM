@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { NavLink, useLocation } from 'react-router-dom'
 import { Menu, X, type LucideIcon } from 'lucide-react'
 import './FloatingMenu.css'
@@ -17,6 +18,7 @@ export type FloatingMenuItem = {
   pressed?: boolean
   panel?: ReactNode
   tone?: 'default' | 'danger'
+  renderControl?: (tooltipId: string) => ReactNode
 }
 
 export function FloatingMenu({ items }: { items: FloatingMenuItem[] }) {
@@ -24,6 +26,7 @@ export function FloatingMenu({ items }: { items: FloatingMenuItem[] }) {
   const location = useLocation()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [activePanel, setActivePanel] = useState<string | null>(null)
+  const [activeTooltip, setActiveTooltip] = useState<{ id: string; itemId: string; label: string; shortcut?: string; left: number; top: number } | null>(null)
   const menuId = 'axiom-floating-menu'
 
   useEffect(() => {
@@ -35,13 +38,31 @@ export function FloatingMenu({ items }: { items: FloatingMenuItem[] }) {
       }
     }
     const onMediaChange = () => setMobileOpen(false)
+    const dismissTooltip = () => setActiveTooltip(null)
     document.addEventListener('pointerdown', closeOnOutside)
     media.addEventListener('change', onMediaChange)
+    window.addEventListener('resize', dismissTooltip, { passive: true })
+    window.addEventListener('scroll', dismissTooltip, { passive: true, capture: true })
     return () => {
       document.removeEventListener('pointerdown', closeOnOutside)
       media.removeEventListener('change', onMediaChange)
+      window.removeEventListener('resize', dismissTooltip)
+      window.removeEventListener('scroll', dismissTooltip, true)
     }
   }, [])
+
+  const showTooltip = (item: FloatingMenuItem, element: HTMLElement) => {
+    if (activePanel === item.id) return
+    if (window.matchMedia('(max-width: 760px)').matches) return
+    const rect = element.getBoundingClientRect()
+    const rootRect = rootRef.current?.getBoundingClientRect()
+    const isLeft = FLOATING_MENU_CORNER.endsWith('left')
+    const width = Math.min(240, window.innerWidth - 24)
+    const preferredLeft = isLeft ? (rootRect?.right ?? rect.right) + 13 : (rootRect?.left ?? rect.left) - width - 13
+    const left = Math.max(12, Math.min(window.innerWidth - width - 12, preferredLeft))
+    const top = Math.max(18, Math.min(window.innerHeight - 18, rect.top + rect.height / 2))
+    setActiveTooltip({ id: `floating-menu-tooltip-${item.id}`, itemId: item.id, label: item.label, shortcut: item.shortcut, left, top })
+  }
 
   function handleKeyDown(event: KeyboardEvent<HTMLElement>) {
     if (event.key === 'Escape') {
@@ -86,11 +107,20 @@ export function FloatingMenu({ items }: { items: FloatingMenuItem[] }) {
             const badge = item.badge ? <span className="floating-menu-badge" aria-label={typeof item.badge === 'boolean' ? 'New' : `${item.badge} updates`}>{typeof item.badge === 'boolean' ? '' : item.badge}</span> : null
             const linkClass = ({ isActive }: { isActive: boolean }) => `floating-menu-button${isActive ? ' is-active' : ''}`
             return (
-              <div className={`floating-menu-entry${expanded ? ' is-expanded' : ''}${item.href && location.pathname === item.href ? ' is-current' : ''}`} key={item.id}>
+              <div
+                className={`floating-menu-entry${expanded ? ' is-expanded' : ''}${item.href && location.pathname === item.href ? ' is-current' : ''}`}
+                key={item.id}
+                onPointerEnter={(event) => showTooltip(item, event.currentTarget)}
+                onPointerLeave={() => setActiveTooltip(null)}
+                onFocusCapture={(event) => showTooltip(item, event.currentTarget)}
+                onBlurCapture={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setActiveTooltip(null) }}
+              >
                 {item.href ? (
                   <NavLink to={item.href} end className={linkClass} aria-label={item.label} aria-describedby={tooltipId} data-menu-entry onClick={closeAfterAction}>
                     <Icon size={23} strokeWidth={1.55} aria-hidden="true" /><span className="floating-menu-label">{item.label}</span>{badge}
                   </NavLink>
+                ) : item.renderControl ? (
+                  item.renderControl(tooltipId)
                 ) : (
                   <button
                     className={`floating-menu-button${expanded ? ' is-active' : ''}${item.pressed ? ' is-pressed' : ''}${item.tone === 'danger' ? ' is-danger' : ''}`}
@@ -102,18 +132,26 @@ export function FloatingMenu({ items }: { items: FloatingMenuItem[] }) {
                     aria-expanded={item.panel ? expanded : undefined}
                     data-menu-entry
                     onClick={() => {
-                      if (item.panel) setActivePanel((active) => active === item.id ? null : item.id)
+                      if (item.panel) {
+                        setActiveTooltip(null)
+                        setActivePanel((active) => active === item.id ? null : item.id)
+                      }
                       else { item.onClick?.(); closeAfterAction() }
                     }}
                   ><Icon size={23} strokeWidth={1.55} aria-hidden="true" /><span className="floating-menu-label">{item.label}</span>{badge}</button>
                 )}
-                <span className="floating-menu-tooltip" id={tooltipId} role="tooltip"><span>{item.label}</span>{item.shortcut && <kbd>{item.shortcut}</kbd>}</span>
                 {item.panel && expanded && <div className="floating-menu-panel" role="dialog" aria-label={item.label} onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); setActivePanel(null) } }}>{item.panel}</div>}
               </div>
             )
           })}
         </div>
       </nav>
+      {activeTooltip && activeTooltip.itemId !== activePanel && createPortal(
+        <span className="floating-menu-tooltip floating-menu-tooltip-portal" id={activeTooltip.id} role="tooltip" style={{ left: activeTooltip.left, top: activeTooltip.top }}>
+          <span>{activeTooltip.label}</span>{activeTooltip.shortcut && <kbd>{activeTooltip.shortcut}</kbd>}
+        </span>,
+        document.body,
+      )}
     </div>
   )
 }

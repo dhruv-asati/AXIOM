@@ -27,9 +27,9 @@ function sessionKindLabel(kind: TimetableSession['kind']) {
 
 type TimetableGridRow = { kind: 'period'; id: number; start?: string; end?: string; teaching?: boolean } | { kind: 'lunch' }
 
-function toDisplaySession(row: TimetableAssignment, calendar: DatasetCalendar): TimetableSession {
-  const start = calendar.periods.find((period) => period.id === row.start_period)?.start
-  const end = calendar.periods.find((period) => period.id === row.end_period)?.end
+function toDisplaySession(row: TimetableAssignment, periodById: Map<number, DatasetCalendar['periods'][number]>): TimetableSession {
+  const start = periodById.get(row.start_period)?.start
+  const end = periodById.get(row.end_period)?.end
   const timeLabel = start && end ? `${start}–${end}` : `P${row.start_period}–P${row.end_period}`
   return {
     id: row.session_id, day: row.day, startPeriod: row.start_period, endPeriod: row.end_period, durationPeriods: row.duration,
@@ -107,6 +107,9 @@ export function TimetablePage() {
   }, [load])
   useEffect(() => { setFilters({ day: '', faculty_id: '', room_id: '', course_id: '', group_id: '' }) }, [selectedDatasetId])
 
+  const periods = useMemo(() => (calendar?.periods ?? []).slice().sort((a, b) => a.id - b.id), [calendar?.periods])
+  const periodById = useMemo(() => new Map(periods.map((period) => [period.id, period])), [periods])
+
   const runGeneration = async () => {
     if (!selectedDatasetId || generating) return
     setGenerating(true)
@@ -132,15 +135,17 @@ export function TimetablePage() {
         && (!filters.course_id || row.course_id === filters.course_id)
         && (!filters.group_id || row.student_groups.some((group) => group.id === filters.group_id)))
       .sort((a, b) => (dayIndex.get(a.day) ?? 99) - (dayIndex.get(b.day) ?? 99) || a.start_period - b.start_period || a.session_id.localeCompare(b.session_id))
-      .map((row) => toDisplaySession(row, calendar))
-  }, [assignments, calendar, filters])
+      .map((row) => toDisplaySession(row, periodById))
+  }, [assignments, calendar, filters, periodById])
   const groupOptions = useMemo(() => {
     const groups = new Map<string, string>()
     assignments.forEach((row) => row.student_groups.forEach((group) => groups.set(group.id, group.name || group.id)))
     return [...groups.entries()].sort((a, b) => a[1].localeCompare(b[1]))
   }, [assignments])
 
-  const periods = (calendar?.periods ?? []).slice().sort((a, b) => a.id - b.id)
+  const facultyOptions = useMemo(() => [...new Set(assignments.map((row) => row.faculty_id))].sort((a, b) => a.localeCompare(b)), [assignments])
+  const roomOptions = useMemo(() => [...new Set(assignments.map((row) => row.room_id))].sort((a, b) => a.localeCompare(b)), [assignments])
+  const courseOptions = useMemo(() => [...new Set(assignments.map((row) => row.course_id))].sort((a, b) => a.localeCompare(b)), [assignments])
   const days = calendar?.days ?? []
   const lunchAfter = calendar?.lunch?.after_period
   const today = new Date()
@@ -149,7 +154,7 @@ export function TimetablePage() {
   const weekRange = days.length
     ? `${formatDate(weekStart, { day: 'numeric', month: 'short' })} – ${formatDate(addLocalDays(weekStart, days.length - 1), { day: 'numeric', month: 'short', year: 'numeric' })}`
     : formatWeekRange(weekStart)
-  const lunchStart = periods.find((period) => period.id === lunchAfter)?.end
+  const lunchStart = lunchAfter === undefined ? undefined : periodById.get(lunchAfter)?.end
   const lunchEnd = periods.find((period) => period.id > (lunchAfter ?? Number.POSITIVE_INFINITY))?.start
   const lunchTime = lunchStart && lunchEnd ? `${lunchStart}–${lunchEnd}` : ''
   const gridRows = useMemo<TimetableGridRow[]>(() => periods.flatMap((period, index) => {
@@ -179,7 +184,6 @@ export function TimetablePage() {
   const dayColumnWidths = days.map((day) => Math.max(240, (dayLayouts.get(day)?.laneCount ?? 1) * 132))
   const dayColumnsTemplate = dayColumnWidths.map((width) => `minmax(${width}px, ${width}fr)`).join(' ')
   const gridStyle = { gridTemplateColumns: `82px ${dayColumnsTemplate}`, minWidth: `${82 + dayColumnWidths.reduce((total, width) => total + width, 0)}px` } as CSSProperties
-  const unique = (values: string[]) => [...new Set(values)].sort((a, b) => a.localeCompare(b))
   const moveWeek = (amount: number) => setWeekStart((current) => addLocalDays(current, amount * 7))
   const returnToCurrentWeek = () => setWeekStart(mondayOfWeek(new Date()))
 
@@ -223,9 +227,9 @@ export function TimetablePage() {
     {loadedDatasetId === selectedDatasetId && scheduleId && <>
       <section className="ops-toolbar" aria-label="Timetable filters">
         <label className="ops-field">Day<select value={filters.day} onChange={(event) => setFilters((state) => ({ ...state, day: event.target.value }))}><option value="">All days</option>{days.map((day) => <option key={day}>{day}</option>)}</select></label>
-        <label className="ops-field">Faculty<select value={filters.faculty_id} onChange={(event) => setFilters((state) => ({ ...state, faculty_id: event.target.value }))}><option value="">All faculty</option>{unique(assignments.map((row) => row.faculty_id)).map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
-        <label className="ops-field">Room<select value={filters.room_id} onChange={(event) => setFilters((state) => ({ ...state, room_id: event.target.value }))}><option value="">All rooms</option>{unique(assignments.map((row) => row.room_id)).map((value) => <option key={value}>{value}</option>)}</select></label>
-        <label className="ops-field">Course<select value={filters.course_id} onChange={(event) => setFilters((state) => ({ ...state, course_id: event.target.value }))}><option value="">All courses</option>{unique(assignments.map((row) => row.course_id)).map((value) => <option key={value}>{value}</option>)}</select></label>
+        <label className="ops-field">Faculty<select value={filters.faculty_id} onChange={(event) => setFilters((state) => ({ ...state, faculty_id: event.target.value }))}><option value="">All faculty</option>{facultyOptions.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+        <label className="ops-field">Room<select value={filters.room_id} onChange={(event) => setFilters((state) => ({ ...state, room_id: event.target.value }))}><option value="">All rooms</option>{roomOptions.map((value) => <option key={value}>{value}</option>)}</select></label>
+        <label className="ops-field">Course<select value={filters.course_id} onChange={(event) => setFilters((state) => ({ ...state, course_id: event.target.value }))}><option value="">All courses</option>{courseOptions.map((value) => <option key={value}>{value}</option>)}</select></label>
         <label className="ops-field">Student group<select value={filters.group_id} onChange={(event) => setFilters((state) => ({ ...state, group_id: event.target.value }))}><option value="">All groups</option>{groupOptions.map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></label>
         <span className="ops-badge">{displaySessions.length} of {assignments.length} sessions</span>
       </section>

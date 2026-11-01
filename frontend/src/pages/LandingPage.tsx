@@ -1,8 +1,9 @@
 import { HoverMember } from '../components/HoverMember'
 import { CrowdCanvas } from '../components/CrowdCanvas'
-import { ArrowUpRight, Moon, Sun } from 'lucide-react'
+import { ArrowUpRight } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useTheme } from '../context/ThemeContext'
+import { ThemeToggle } from '../components/ui/ThemeToggle'
 import './PublicPages.css'
 
 const projectFeatures = [
@@ -17,14 +18,11 @@ const projectFeatures = [
 ]
 
 export function LandingPage() {
-  const { theme, toggleTheme } = useTheme()
+  const { theme } = useTheme()
   return (
     <main className="landing-showcase" data-theme={theme} aria-label="AXIOM project features">
       <CrowdCanvas />
-      <button className="landing-theme-toggle" type="button" onClick={toggleTheme} aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'} aria-pressed={theme === 'dark'} title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}>
-        {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-        <span>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
-      </button>
+      <ThemeToggle className="landing-theme-toggle" transition={{ variant: 'circle', origin: 'center' }} />
       <Link className="landing-sign-in" to="/login">Sign in <ArrowUpRight size={15} /></Link>
       <div className="landing-feature-content">
         <h1 className="landing-brand-title">AXIOM</h1>

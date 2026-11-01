@@ -17,6 +17,12 @@ test('role route policies expose only appropriate workspace sections', () => {
   assert.equal(canAccessRole('department_coordinator', ROUTE_ROLES.adminDepartment), true)
 })
 
+test('the authenticated Account page is available to each AXIOM role', () => {
+  for (const role of ['admin', 'department_coordinator', 'faculty', 'club_representative']) {
+    assert.equal(canAccessRole(role, ROUTE_ROLES.signedIn), true, `${role} should be able to view their own account`)
+  }
+})
+
 test('approval controls are visible only to their authorized roles', () => {
   assert.equal(canApproveDepartmentLabs('department_coordinator'), true)
   assert.equal(canApproveDepartmentLabs('admin'), false)

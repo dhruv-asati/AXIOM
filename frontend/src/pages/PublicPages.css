@@ -37,6 +37,10 @@
 .landing-theme-toggle { position: absolute; z-index: 8; top: clamp(18px,4vh,34px); left: clamp(20px,6vw,96px); display: inline-flex; min-height: 40px; align-items: center; gap: 9px; padding: 0 14px; border: 1px solid #dce3ef; border-radius: 6px; color: #264a91; background: #fff; box-shadow: 0 4px 14px rgba(24,48,84,.06); font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; transition: border-color .16s,box-shadow .16s,transform .16s,background .16s,color .16s; }
 .landing-theme-toggle:hover { transform: translateY(-1px); border-color: #a9bce9; box-shadow: 0 7px 18px rgba(24,48,84,.12); }
 .landing-theme-toggle:focus-visible { outline: 3px solid #8fa8e7; outline-offset: 3px; }
+.landing-showcase .axiom-theme-toggle.landing-theme-toggle { border-color: rgba(103,119,105,.24); color: #3c493f; background: rgba(255,255,255,.84); box-shadow: 0 8px 22px rgba(33,43,35,.1); }
+.landing-showcase .axiom-theme-toggle.landing-theme-toggle:hover { border-color: rgba(103,130,108,.5); background: rgba(255,255,255,.96); box-shadow: 0 10px 25px rgba(33,43,35,.16); }
+.landing-showcase[data-theme="dark"] .axiom-theme-toggle.landing-theme-toggle { border-color: rgba(193,208,196,.24); color: #e9eee9; background: rgba(31,39,34,.84); box-shadow: 0 8px 22px rgba(0,0,0,.22); }
+.landing-showcase[data-theme="dark"] .axiom-theme-toggle.landing-theme-toggle:hover { border-color: rgba(169,190,173,.54); background: rgba(48,59,51,.94); }
 .landing-showcase[data-theme="dark"] { color: #edf1f5; background: #171d1b; }
 .landing-showcase[data-theme="dark"] .landing-brand-title { color: #eff3fb; text-shadow: 0 2px 20px rgba(0,0,0,.32); }
 .landing-showcase[data-theme="dark"] .hover-member { --member-word-color: #f2f5fb; --member-accent-color: #a9b9ee; --member-cursor-color: #a9b9ee; }

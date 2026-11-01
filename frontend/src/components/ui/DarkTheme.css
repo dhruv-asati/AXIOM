@@ -274,6 +274,7 @@
 .application-shell[data-theme="dark"] .content-container .assignment-mobile-card dl { border-color: #465149; }
 .application-shell[data-theme="dark"] .content-container .assignment-mobile-card dt { color: #b5c0b8; }
 .application-shell[data-theme="dark"] .content-container .assignment-mobile-card dd { color: #edf2ee; }
+.application-shell[data-theme="dark"] .content-container .dashboard-table-scroll-hint { color: #c1ccc4; }
 .application-shell[data-theme="dark"] .content-container .academic-grid-scroll::-webkit-scrollbar-track,
 .application-shell[data-theme="dark"] .content-container .ops-table-wrap::-webkit-scrollbar-track { background: #252e29; }
 .application-shell[data-theme="dark"] .content-container .academic-grid-scroll::-webkit-scrollbar-thumb,

@@ -22,6 +22,7 @@ const DisruptionsPage = lazy(() => import('./pages/DisruptionsPage').then((modul
 const AssistantPage = lazy(() => import('./pages/AssistantPage').then((module) => ({ default: module.AssistantPage })))
 const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage').then((module) => ({ default: module.AnalyticsPage })))
 const SettingsPage = lazy(() => import('./pages/SettingsPage').then((module) => ({ default: module.SettingsPage })))
+const AccountPage = lazy(() => import('./pages/AccountPage').then((module) => ({ default: module.AccountPage })))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage').then((module) => ({ default: module.NotFoundPage })))
 
 function PageFallback() {
@@ -49,6 +50,7 @@ function App() {
           <Route path="/assistant" element={<ProtectedRoute roles={ROUTE_ROLES.teaching} />}><Route index element={<Suspense fallback={<PageFallback />}><AssistantPage /></Suspense>} /></Route>
           <Route path="/analytics" element={<ProtectedRoute roles={ROUTE_ROLES.admin} />}><Route index element={<Suspense fallback={<PageFallback />}><AnalyticsPage /></Suspense>} /></Route>
           <Route path="/settings" element={<ProtectedRoute roles={ROUTE_ROLES.admin} />}><Route index element={<Suspense fallback={<PageFallback />}><SettingsPage /></Suspense>} /></Route>
+          <Route path="/account" element={<ProtectedRoute roles={ROUTE_ROLES.signedIn} />}><Route index element={<Suspense fallback={<PageFallback />}><AccountPage /></Suspense>} /></Route>
           <Route path="*" element={<Suspense fallback={<PageFallback />}><NotFoundPage /></Suspense>} />
         </Route>
         <Route path="/forbidden" element={<ProtectedRoute roles={ROUTE_ROLES.signedIn} />}><Route index element={<ForbiddenPage />} /></Route>

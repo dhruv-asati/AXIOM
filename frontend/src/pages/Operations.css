@@ -30,6 +30,10 @@
 .ops-empty strong { color: #5b6a7d; font-size: 11px; }
 .ops-empty span { max-width: 430px; font-size: 9.5px; line-height: 1.55; }
 .ops-table-wrap { width: 100%; overflow: auto; border: 1px solid #e8ebef; border-radius: 7px; }
+.dashboard-horizontal-scroll { max-width: 100%; min-width: 0; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; scrollbar-width: thin; }
+.dashboard-preview-table { min-width: 800px; }
+.dashboard-booking-table { min-width: 760px; }
+.dashboard-table-scroll-hint { display: none; }
 .ops-table { width: 100%; border-collapse: collapse; background: #fff; font-size: 9.5px; }
 .ops-table th, .ops-table td { padding: 10px 11px; border-bottom: 1px solid #edf0f2; text-align: left; vertical-align: top; white-space: nowrap; }
 .ops-table th { color: #8994a2; background: #fafbfc; font-size: 8px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
@@ -305,6 +309,11 @@
   .assignment-mobile-card dl > div { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 8px; }
   .assignment-mobile-card dt { color: #788596; font-size: 11px; }
   .assignment-mobile-card dd { min-width: 0; margin: 0; color: #3e4e62; font-size: 12px; line-height: 1.4; overflow-wrap: anywhere; }
+  .dashboard-horizontal-scroll { width: 100%; overflow-x: auto; overscroll-behavior-x: contain; touch-action: auto; scrollbar-color: #87978b #303934; }
+  .dashboard-horizontal-scroll::-webkit-scrollbar { height: 8px; }
+  .dashboard-horizontal-scroll::-webkit-scrollbar-track { background: #303934; }
+  .dashboard-horizontal-scroll::-webkit-scrollbar-thumb { border: 2px solid #303934; border-radius: 999px; background: #87978b; }
+  .dashboard-table-scroll-hint { display: block; margin-top: 5px; color: var(--ink-500); font-size: 11px; }
   .ops-toolbar { align-items: stretch; }
   .ops-field { flex-basis: 100%; }
   .ops-button-row { width: 100%; }

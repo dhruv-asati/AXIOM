@@ -176,21 +176,32 @@ export function CrowdCanvas() {
       render(0, TARGET_FRAME_MS, true)
     }
 
-    const onVisibilityChange = () => {
-      if (!document.hidden) render(0, TARGET_FRAME_MS, true)
-    }
-    const onMotionPreferenceChange = (event: MediaQueryListEvent) => {
-      reducedMotion = event.matches
-      if (reducedMotion) {
-        if (tickerAttached) gsap.ticker.remove(render)
-        tickerAttached = false
-        render(0, TARGET_FRAME_MS, true)
-      } else if (!tickerAttached) {
+    const attachTicker = () => {
+      if (!tickerAttached && !reducedMotion && !document.hidden && image.complete && image.naturalWidth) {
         gsap.ticker.add(render)
         tickerAttached = true
       }
     }
-    const onImageLoad = () => render(0, TARGET_FRAME_MS, true)
+    const detachTicker = () => {
+      if (!tickerAttached) return
+      gsap.ticker.remove(render)
+      tickerAttached = false
+    }
+    const onVisibilityChange = () => {
+      if (document.hidden) detachTicker()
+      else {
+        render(0, TARGET_FRAME_MS, true)
+        attachTicker()
+      }
+    }
+    const onMotionPreferenceChange = (event: MediaQueryListEvent) => {
+      reducedMotion = event.matches
+      if (reducedMotion) {
+        detachTicker()
+        render(0, TARGET_FRAME_MS, true)
+      } else attachTicker()
+    }
+    const onImageLoad = () => { render(0, TARGET_FRAME_MS, true); attachTicker() }
     const onImageError = () => container.classList.add('crowd-canvas-fallback')
 
     resize()
@@ -199,15 +210,14 @@ export function CrowdCanvas() {
     document.addEventListener('visibilitychange', onVisibilityChange)
     window.addEventListener('resize', resize, { passive: true })
     motionPreference.addEventListener('change', onMotionPreferenceChange)
-    if (!reducedMotion) {
-      gsap.ticker.add(render)
-      tickerAttached = true
+    if (image.complete && image.naturalWidth) {
+      render(0, TARGET_FRAME_MS, true)
+      attachTicker()
     }
-    if (image.complete && image.naturalWidth) render(0, TARGET_FRAME_MS, true)
 
     return () => {
       disposed = true
-      if (tickerAttached) gsap.ticker.remove(render)
+      detachTicker()
       gsap.killTweensOf(walkers)
       image.removeEventListener('load', onImageLoad)
       image.removeEventListener('error', onImageError)

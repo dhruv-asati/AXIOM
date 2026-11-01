@@ -46,6 +46,7 @@
 .floating-menu-button:focus-visible, .floating-menu-mobile-toggle:focus-visible { outline: 2px solid #b5c4b8; outline-offset: 2px; }
 .floating-menu-badge { position: absolute; top: 5px; right: 5px; display: grid; min-width: 9px; height: 9px; place-items: center; padding: 0 2px; border: 1.5px solid #000; border-radius: 999px; color: #fff; background: #9c8c66; font-size: 8px; line-height: 1; }
 .floating-menu-tooltip { position: absolute; z-index: 3; top: 50%; right: calc(100% + 11px); display: flex; align-items: center; gap: 9px; width: max-content; max-width: min(240px, calc(100vw - 100px)); padding: 8px 10px; border: 1px solid rgba(255,255,255,.1); border-radius: 7px; color: #fff; background: #080a0d; box-shadow: 0 6px 18px rgba(0,0,0,.2); font-size: 11px; font-weight: 550; line-height: 1.25; white-space: nowrap; opacity: 0; pointer-events: none; transform: translate(6px, -50%); transition: opacity .12s ease, transform .12s ease; }
+.floating-menu-tooltip-portal { position: fixed; z-index: 10000; right: auto; width: max-content; max-width: min(240px, calc(100vw - 24px)); white-space: normal; opacity: 1; pointer-events: none; transform: translateY(-50%); }
 .floating-menu-entry:hover .floating-menu-tooltip, .floating-menu-button:focus-visible ~ .floating-menu-tooltip { opacity: 1; transform: translate(0, -50%); }
 .floating-menu-tooltip kbd { min-width: 18px; padding: 2px 4px; border: 1px solid rgba(255,255,255,.25); border-radius: 4px; color: #d7dce3; font: inherit; font-size: 9px; text-align: center; }
 .floating-menu-panel { position: absolute; z-index: 5; top: 50%; right: calc(100% + 12px); width: 258px; max-width: calc(100vw - 104px); padding: 14px; border: 1px solid #e6e9ee; border-radius: 12px; color: #26364a; background: #fff; box-shadow: 0 16px 40px rgba(14,25,41,.2); animation: floating-panel-in .13s ease both; }
@@ -56,6 +57,8 @@
 .floating-menu-account { display: grid; gap: 4px; }
 .floating-menu-account strong { color: #304158; font-size: 12px; }
 .floating-menu-account span { color: #788697; font-size: 10px; line-height: 1.45; }
+.workspace-layout-error { position: relative; z-index: 2; margin: 14px 0; padding: 11px 14px; border: 1px solid #eed9d4; border-radius: 8px; color: #9b5e50; background: #fff8f6; font-size: 12px; }
+.application-shell[data-theme="dark"] .workspace-layout-error { border-color: #654640; color: #f0bbb0; background: #332724; }
 @keyframes floating-panel-in { from { opacity: 0; transform: translateY(-50%) translateX(4px); } to { opacity: 1; transform: translateY(-50%) translateX(0); } }
 
 .floating-menu-root[data-corner$="left"] .floating-menu-tooltip { right: auto; left: calc(100% + 11px); transform: translate(-6px, -50%); }

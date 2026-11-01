@@ -23,6 +23,7 @@ export function AssistantPage() {
   const navigate = useNavigate()
   const commandRoot = useRef<HTMLDivElement>(null)
   const messageInput = useRef<HTMLTextAreaElement>(null)
+  const positionFrame = useRef<number | null>(null)
   const [mode, setMode] = useState<'booking' | 'disruption'>('disruption')
   const [message, setMessage] = useState('')
   const [commandsOpen, setCommandsOpen] = useState(false)
@@ -46,6 +47,9 @@ export function AssistantPage() {
   useEffect(() => {
     if (!commandsOpen) return
     const positionPopover = () => {
+      if (positionFrame.current !== null) return
+      positionFrame.current = requestAnimationFrame(() => {
+      positionFrame.current = null
       const root = commandRoot.current
       if (!root) return
       const bounds = root.getBoundingClientRect()
@@ -54,11 +58,14 @@ export function AssistantPage() {
       const openAbove = below < 280 && above > below
       setCommandsAbove(openAbove)
       root.style.setProperty('--assistant-popover-max-height', `${Math.max(120, (openAbove ? above : below) - 8)}px`)
+      })
     }
     positionPopover()
     window.addEventListener('resize', positionPopover)
     window.addEventListener('scroll', positionPopover, true)
     return () => {
+      if (positionFrame.current !== null) cancelAnimationFrame(positionFrame.current)
+      positionFrame.current = null
       window.removeEventListener('resize', positionPopover)
       window.removeEventListener('scroll', positionPopover, true)
     }

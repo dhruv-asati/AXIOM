@@ -44,6 +44,7 @@ type WheelColumnProps = {
 function WheelColumn({ label, options, selectedIndex, valueText, disabled, onSettle }: WheelColumnProps) {
   const scrollerRef = useRef<HTMLDivElement>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const programmaticResetRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const programmaticRef = useRef(false)
   const [visualIndex, setVisualIndex] = useState(selectedIndex)
   const paddedOptions = useMemo(() => options, [options])
@@ -59,7 +60,15 @@ function WheelColumn({ label, options, selectedIndex, valueText, disabled, onSet
     }
   }, [selectedIndex])
 
-  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current) }, [])
+  useEffect(() => () => {
+    if (timerRef.current) clearTimeout(timerRef.current)
+    if (programmaticResetRef.current) clearTimeout(programmaticResetRef.current)
+  }, [])
+
+  const resetProgrammaticScroll = (delay: number) => {
+    if (programmaticResetRef.current) clearTimeout(programmaticResetRef.current)
+    programmaticResetRef.current = setTimeout(() => { programmaticRef.current = false }, delay)
+  }
 
   const settle = () => {
     const node = scrollerRef.current
@@ -70,7 +79,7 @@ function WheelColumn({ label, options, selectedIndex, valueText, disabled, onSet
     node.scrollTo({ top: next * ROW_HEIGHT, behavior: 'smooth' })
     if (timerRef.current) clearTimeout(timerRef.current)
     timerRef.current = setTimeout(() => onSettle(next), 190)
-    setTimeout(() => { programmaticRef.current = false }, 250)
+    resetProgrammaticScroll(250)
   }
 
   const moveTo = (index: number) => {
@@ -81,7 +90,7 @@ function WheelColumn({ label, options, selectedIndex, valueText, disabled, onSet
     scrollerRef.current?.scrollTo({ top: next * ROW_HEIGHT, behavior: 'smooth' })
     if (timerRef.current) clearTimeout(timerRef.current)
     timerRef.current = setTimeout(() => onSettle(next), 210)
-    setTimeout(() => { programmaticRef.current = false }, 270)
+    resetProgrammaticScroll(270)
   }
 
   const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {

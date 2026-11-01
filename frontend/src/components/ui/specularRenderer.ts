@@ -10,7 +10,7 @@ export type SpecularOptions = {
   intensity?: number
 }
 
-type SurfaceRecord = { element: HTMLElement; options: SpecularOptions; visible: boolean; source: 'manual' | 'auto' }
+type SurfaceRecord = { element: HTMLElement; options: SpecularOptions; visible: boolean; source: 'manual' | 'auto'; radius: number; tint: [number, number, number] }
 type Uniforms = Record<string, WebGLUniformLocation | null>
 
 const surfaces = new Map<HTMLElement, SurfaceRecord>()
@@ -31,6 +31,8 @@ let pointerX = -10000
 let pointerY = -10000
 let reducedMotion = false
 let motionPreference: MediaQueryList | null = null
+let themeObserver: MutationObserver | null = null
+let positionAttribute = -1
 
 const vertexSource = `#version 300 es
 in vec2 a_position;
@@ -141,7 +143,7 @@ function render() {
   gl.enable(gl.BLEND)
   gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
   gl.useProgram(shaderProgram)
-  const position = gl.getAttribLocation(shaderProgram, 'a_position')
+  const position = positionAttribute
   gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer)
   gl.enableVertexAttribArray(position)
   gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0)
@@ -161,7 +163,7 @@ function render() {
     record.element.dataset.specularNear = proximity > 0 ? 'true' : 'false'
     const localX = (pointerX - rect.left) * pixelRatio
     const localY = (rect.bottom - pointerY) * pixelRatio
-    const radius = options.radius ?? (Number.parseFloat(getComputedStyle(record.element).borderTopLeftRadius) || 10)
+    const radius = record.radius
     const scale = pixelRatio
     gl.uniform4f(uniform('u_rect'), rect.left * scale, viewHeight - rect.bottom * scale, rect.width * scale, rect.height * scale)
     gl.uniform2f(uniform('u_pointer'), localX, localY)
@@ -172,7 +174,7 @@ function render() {
     gl.uniform1f(uniform('u_glow'), options.glow ?? (options.kind === 'button' ? 0.16 : 0.065))
     gl.uniform1f(uniform('u_proximity'), proximity)
     gl.uniform1f(uniform('u_intensity'), options.intensity ?? (options.kind === 'button' ? 0.48 : 0.2))
-    gl.uniform3fv(uniform('u_tint'), readTint(record.element, options.tint))
+    gl.uniform3fv(uniform('u_tint'), record.tint)
     gl.uniform1f(uniform('u_idle'), reducedMotion ? 0.045 : (options.kind === 'button' ? 0.05 : 0.028))
     const x = Math.max(0, Math.floor(rect.left * scale))
     const y = Math.max(0, Math.floor(viewHeight - rect.bottom * scale))
@@ -255,6 +257,8 @@ function stopObservers() {
   resizeObserver?.disconnect()
   intersectionObserver = null
   resizeObserver = null
+  themeObserver?.disconnect()
+  themeObserver = null
 }
 
 function releaseRenderer() {
@@ -279,6 +283,7 @@ function releaseRenderer() {
   context = null
   shaderProgram = null
   vertexBuffer = null
+  positionAttribute = -1
   uniformLocations = {}
   for (const record of surfaces.values()) markFallback(record, true)
 }
@@ -361,11 +366,22 @@ function initializeRenderer(canvas: HTMLCanvasElement) {
   context = gl
   shaderProgram = program
   vertexBuffer = buffer
+  positionAttribute = gl.getAttribLocation(program, 'a_position')
   for (const name of ['u_rect', 'u_pointer', 'u_radius', 'u_thickness', 'u_shine_size', 'u_shine_fade', 'u_glow', 'u_proximity', 'u_intensity', 'u_tint', 'u_idle']) {
     uniformLocations[name] = gl.getUniformLocation(program, name)
   }
   for (const record of surfaces.values()) markFallback(record, false)
   startObservers()
+  if (typeof MutationObserver !== 'undefined') {
+    themeObserver = new MutationObserver(() => {
+      for (const record of surfaces.values()) {
+        record.tint = readTint(record.element, record.options.tint)
+        if (record.options.radius === undefined) record.radius = Number.parseFloat(getComputedStyle(record.element).borderTopLeftRadius) || 10
+      }
+      requestRender()
+    })
+    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'], subtree: true })
+  }
   motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)')
   reducedMotion = motionPreference.matches
   motionPreference.addEventListener('change', onMotionPreferenceChange)
@@ -400,9 +416,15 @@ export function registerSpecularSurface(element: HTMLElement, options: SpecularO
   if (existing) {
     existing.options = options
     existing.source = source
+    existing.radius = options.radius ?? (Number.parseFloat(getComputedStyle(element).borderTopLeftRadius) || 10)
+    existing.tint = readTint(element, options.tint)
     return () => unregisterSpecularSurface(element, source)
   }
-  const record: SurfaceRecord = { element, options, visible: true, source }
+  const record: SurfaceRecord = {
+    element, options, visible: true, source,
+    radius: options.radius ?? (Number.parseFloat(getComputedStyle(element).borderTopLeftRadius) || 10),
+    tint: readTint(element, options.tint),
+  }
   surfaces.set(element, record)
   markFallback(record, !context)
   intersectionObserver?.observe(element)

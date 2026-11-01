@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   Settings2,
   ShieldAlert,
+  UserRound,
   type LucideIcon,
 } from 'lucide-react'
 import type { UserRole } from '../../auth/AuthContext'
@@ -25,6 +26,7 @@ const admin: UserRole[] = ['admin']
 const adminDepartment: UserRole[] = ['admin', 'department_coordinator']
 const teaching: UserRole[] = ['admin', 'department_coordinator', 'faculty']
 const venue: UserRole[] = ['admin', 'department_coordinator', 'club_representative']
+const signedIn: UserRole[] = ['admin', 'department_coordinator', 'faculty', 'club_representative']
 export const primaryNavigation: NavigationEntry[] = [
   { id: 'overview', label: 'Overview', to: '/dashboard', icon: LayoutDashboard, roles: admin },
   { id: 'datasets', label: 'Datasets', to: '/datasets', icon: Database, roles: admin },
@@ -35,6 +37,7 @@ export const primaryNavigation: NavigationEntry[] = [
   { id: 'disruptions', label: 'Disruptions', to: '/disruptions', icon: ShieldAlert, roles: teaching },
   { id: 'assistant', label: 'Assistant', to: '/assistant', icon: Bot, roles: teaching },
   { id: 'analytics', label: 'Analytics', to: '/analytics', icon: BarChart3, roles: admin },
+  { id: 'account', label: 'Account', to: '/account', icon: UserRound, roles: signedIn },
 ]
 
 export const settingsNavigation: NavigationEntry = {
@@ -60,5 +63,6 @@ export const routeTitles: Record<string, string> = {
   '/assistant': 'Assistant',
   '/analytics': 'Analytics',
   '/settings': 'Settings',
+  '/account': 'Account',
 }
 
