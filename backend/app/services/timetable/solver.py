@@ -470,17 +470,25 @@ def _build_and_solve(
     no_candidate_exams: list[str] = []
     exam_rooms = [room for room in rooms if "exam" in (room.allowed_uses or [])]
     for exam in exams:
+        baseline_exam = baseline_exam_assignments.get(exam.source_id)
+        candidate_exam_rooms = exam_rooms
+        if repair_mode and baseline_exam is not None:
+            candidate_exam_rooms = [room for room in exam_rooms if room.source_id in baseline_exam[2]]
         if not exam_days or not exam_slots:
             no_candidate_exams.append(exam.source_id)
             continue
         for day in exam_days:
+            if repair_mode and baseline_exam is not None and day != baseline_exam[0]:
+                continue
             for slot in exam_slots:
+                if repair_mode and baseline_exam is not None and slot != baseline_exam[1]:
+                    continue
                 key = (exam.source_id, day, slot)
                 y = model.new_bool_var(f"exam_{exam.source_id}_{day}_{slot}")
                 exam_y[key] = y
                 exam_candidates[exam.source_id].append((day, slot))
                 room_vars = []
-                for room in exam_rooms:
+                for room in candidate_exam_rooms:
                     z = model.new_bool_var(f"exam_room_{exam.source_id}_{day}_{slot}_{room.source_id}")
                     exam_z[(exam.source_id, day, slot, room.source_id)] = z
                     model.add(z <= y)
@@ -492,7 +500,6 @@ def _build_and_solve(
         if not exam_candidates[exam.source_id]:
             no_candidate_exams.append(exam.source_id)
         model.add(sum(exam_y[(exam.source_id, day, slot)] for day, slot in exam_candidates[exam.source_id]) == 1)
-        baseline_exam = baseline_exam_assignments.get(exam.source_id)
         if baseline_exam is not None:
             original_day, original_slot, original_rooms = baseline_exam
             for day, slot in exam_candidates[exam.source_id]:

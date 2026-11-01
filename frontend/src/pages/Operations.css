@@ -89,6 +89,10 @@
 .rooms-page .ops-inline-note { font-size: 11px; }
 .ops-callout { padding: 10px 12px; border-left: 3px solid #8b9ad8; border-radius: 4px; color: #617086; background: #f7f8fc; font-size: 9px; line-height: 1.6; }
 .ops-json { max-height: 310px; overflow: auto; padding: 12px; border: 1px solid #e6e9ee; border-radius: 7px; color: #526278; background: #f9fafb; font: 9px/1.55 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+.disruption-change-list { display: grid; gap: 7px; margin: 0; padding-left: 18px; color: #586777; font-size: 12px; line-height: 1.55; }
+.disruption-proposal-section { display: grid; gap: 7px; }
+.disruption-proposal-section h4 { margin: 0; color: #465363; font-size: 12px; font-weight: 650; }
+.disruption-proposal-section p { margin: 0; color: #758396; font-size: 12px; line-height: 1.55; }
 .ops-progress { display: inline-flex; align-items: center; gap: 8px; color: #68788b; font-size: 10px; }
 .ops-progress svg { animation: spin .9s linear infinite; }
 .ops-file-list { display: flex; flex-wrap: wrap; gap: 6px; }
