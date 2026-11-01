@@ -1,0 +1,381 @@
+/* Authenticated AXIOM surfaces: graphite, paper and silver, sampled from the monochrome crowd artwork. */
+.application-shell {
+  --ink-950: #202831;
+  --ink-700: #4b5661;
+  --ink-500: #737e88;
+  --ink-400: #929ba4;
+  --line: #e1e5e8;
+  --paper: #fff;
+  --canvas: #f3f4f4;
+  --accent: #56616c;
+  --accent-deep: #37414a;
+  --accent-wash: #eaedef;
+  --bento-ink: #202831;
+  --bento-muted: #737e88;
+  --bento-border: #e1e5e8;
+  --bento-surface: rgba(255,255,255,.94);
+  --bento-secondary: #f1f3f4;
+  --bento-spot: 94, 106, 116;
+  --bento-shadow: 0 12px 30px rgba(32,40,49,.065);
+  --bento-focus: #56616c;
+}
+
+.application-shell .content-container .ops-card,
+.application-shell .content-container .ops-record-card,
+.application-shell .content-container .ops-stat,
+.application-shell .content-container .ops-empty,
+.application-shell .content-container .ops-toolbar,
+.application-shell .content-container .ops-table-wrap,
+.application-shell .content-container .ops-calendar-scroll,
+.application-shell .content-container .ops-message,
+.application-shell .content-container .ops-callout,
+.application-shell .content-container .section-placeholder,
+.application-shell .content-container .booking-form-panel,
+.application-shell .content-container .booking-requests-panel,
+.application-shell .content-container .disruption-panel,
+.application-shell .content-container .disruption-flow,
+.application-shell .content-container .analytics-insight-card,
+.application-shell .content-container .assistant-chat-panel,
+.application-shell .content-container .assistant-suggestions-card,
+.application-shell .content-container .assistant-capabilities-card {
+  border-color: var(--bento-border);
+  color: var(--bento-ink);
+  background: linear-gradient(145deg, rgba(255,255,255,.97), rgba(242,244,245,.94));
+  box-shadow: var(--bento-shadow);
+}
+
+.application-shell .content-container .ops-card,
+.application-shell .content-container .ops-record-card,
+.application-shell .content-container .ops-stat,
+.application-shell .content-container .ops-table-wrap,
+.application-shell .content-container .booking-form-panel,
+.application-shell .content-container .booking-requests-panel,
+.application-shell .content-container .disruption-panel,
+.application-shell .content-container .analytics-insight-card,
+.application-shell .content-container .assistant-chat-panel,
+.application-shell .content-container .assistant-suggestions-card,
+.application-shell .content-container .assistant-capabilities-card {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease, background-color .2s ease;
+}
+
+.application-shell .content-container .ops-card::before,
+.application-shell .content-container .ops-record-card::before,
+.application-shell .content-container .ops-stat::before,
+.application-shell .content-container .booking-form-panel::before,
+.application-shell .content-container .booking-requests-panel::before,
+.application-shell .content-container .disruption-panel::before,
+.application-shell .content-container .analytics-insight-card::before,
+.application-shell .content-container .assistant-chat-panel::before,
+.application-shell .content-container .assistant-suggestions-card::before,
+.application-shell .content-container .assistant-capabilities-card::before,
+.magic-bento::before {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(340px circle at var(--bento-x, 50%) var(--bento-y, 0%), rgba(var(--bento-spot), .09), transparent 72%);
+  content: '';
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .22s ease;
+}
+
+.application-shell .content-container .ops-card:hover,
+.application-shell .content-container .ops-record-card:hover,
+.application-shell .content-container .ops-stat:hover,
+.application-shell .content-container .booking-form-panel:hover,
+.application-shell .content-container .booking-requests-panel:hover,
+.application-shell .content-container .disruption-panel:hover,
+.application-shell .content-container .analytics-insight-card:hover,
+.application-shell .content-container .assistant-chat-panel:hover,
+.application-shell .content-container .assistant-suggestions-card:hover,
+.application-shell .content-container .assistant-capabilities-card:hover,
+.magic-bento:hover {
+  border-color: #c6ccd1;
+  box-shadow: 0 16px 36px rgba(32,40,49,.105);
+}
+.application-shell .content-container .ops-card:hover::before,
+.application-shell .content-container .ops-record-card:hover::before,
+.application-shell .content-container .ops-stat:hover::before,
+.application-shell .content-container .booking-form-panel:hover::before,
+.application-shell .content-container .booking-requests-panel:hover::before,
+.application-shell .content-container .disruption-panel:hover::before,
+.application-shell .content-container .analytics-insight-card:hover::before,
+.application-shell .content-container .assistant-chat-panel:hover::before,
+.application-shell .content-container .assistant-suggestions-card:hover::before,
+.application-shell .content-container .assistant-capabilities-card:hover::before,
+.magic-bento:hover::before { opacity: 1; }
+
+/* Vary surface hierarchy by purpose rather than repeating one card treatment. */
+.application-shell .content-container .ops-stat { border-top: 3px solid #606b75; background: linear-gradient(150deg,#fff,#f3f4f5); }
+.application-shell .content-container .ops-stat:nth-child(3n + 2) { border-top-color: #87919a; background: linear-gradient(150deg,#fff,#f5f5f4); }
+.application-shell .content-container .ops-stat:nth-child(3n) { border-top-color: #a29c91; background: linear-gradient(150deg,#fff,#f5f4f2); }
+.application-shell .content-container .ops-toolbar { border-color: #dfe3e6; color: var(--bento-ink); background: linear-gradient(130deg,#fff,#eceff1); }
+.application-shell .content-container .rooms-page > .ops-toolbar { border-color: #dfe3e6; color: #3a444d; background: linear-gradient(130deg,#fff,#eceff1); box-shadow: var(--bento-shadow); }
+.application-shell .content-container .rooms-page > .ops-toolbar .ops-field,
+.application-shell .content-container .rooms-page > .ops-toolbar .ops-check-row { color: #59646e; }
+.application-shell .content-container .rooms-page > .ops-toolbar .ops-field input,
+.application-shell .content-container .rooms-page > .ops-toolbar .ops-field select { border-color: #d7dce0; color: #35404a; background: #fff; }
+.application-shell .content-container .rooms-page > .ops-toolbar .ops-field select option { color: #35404a; background: #fff; }
+.application-shell .content-container .rooms-page > .ops-toolbar .ops-button { border-color: #d4d9dd; color: #424d57; background: #fff; }
+.application-shell .content-container .rooms-page > .ops-toolbar .ops-button:hover:not(:disabled) { border-color: #aeb6bd; color: #28323b; background: #f1f3f4; }
+.application-shell .content-container .rooms-page .ops-record-card { border-color: #dfe3e6; color: #28323b; background: linear-gradient(145deg,#fff,#f0f2f3); box-shadow: var(--bento-shadow); }
+.application-shell .content-container .rooms-page .ops-record-card h3 { color: #28323b; }
+.application-shell .content-container .rooms-page .ops-record-card > p,
+.application-shell .content-container .rooms-page .ops-record-card .ops-detail span,
+.application-shell .content-container .rooms-page .ops-record-card .ops-inline-note { color: #68737d; }
+.application-shell .content-container .rooms-page .ops-record-card .ops-detail strong { color: #303b44; }
+.application-shell .content-container .rooms-page .ops-record-card > header .ops-badge { border-color: #d9dee2; color: #56616b; background: #f0f2f3; }
+.application-shell .content-container .rooms-page .ops-record-card .ops-field { color: #59646e; }
+.application-shell .content-container .rooms-page .ops-record-card .ops-field input { border-color: #d7dce0; color: #35404a; background: #fff; }
+.application-shell .content-container .rooms-page .ops-record-card .ops-button { border-color: #d4d9dd; color: #fff; background: #424c56; }
+.application-shell .content-container .ops-empty { border-style: dashed; background: rgba(255,255,255,.76); box-shadow: none; }
+.application-shell .content-container .ops-message { background: #f8f9f9; }
+.application-shell .content-container .ops-message.error { border-color: #ecd9d4; color: #925f52; background: #fff9f7; }
+.application-shell .content-container .ops-message.success { border-color: #d9e8de; color: #4d7860; background: #f7fbf8; }
+
+.application-shell .content-container .ops-card h2,
+.application-shell .content-container .ops-card h3,
+.application-shell .content-container .ops-record-card h3,
+.application-shell .content-container .ops-stat strong,
+.application-shell .content-container .ops-empty strong,
+.application-shell .content-container .booking-form-panel h2,
+.application-shell .content-container .booking-requests-panel h2,
+.application-shell .content-container .disruption-panel-heading h2 { color: #28323b; }
+.application-shell .content-container .ops-card-heading p,
+.application-shell .content-container .ops-record-card p,
+.application-shell .content-container .ops-stat span,
+.application-shell .content-container .ops-stat small,
+.application-shell .content-container .ops-empty,
+.application-shell .content-container .ops-empty span,
+.application-shell .content-container .booking-form-panel p,
+.application-shell .content-container .booking-requests-panel p,
+.application-shell .content-container .booking-form-field,
+.application-shell .content-container .booking-form-field > span,
+.application-shell .content-container .booking-contract-hint,
+.application-shell .content-container .booking-form-disabled-note,
+.application-shell .content-container .booking-status-note,
+.application-shell .content-container .disruption-panel-heading p,
+.application-shell .content-container .disruption-panel-description,
+.application-shell .content-container .disruption-panel-footnote,
+.application-shell .content-container .ops-inline-note { color: #69747e; }
+
+.application-shell .content-container .ops-field { color: #59646e; }
+.application-shell .content-container .ops-field input,
+.application-shell .content-container .ops-field select,
+.application-shell .content-container .ops-field textarea,
+.application-shell .content-container .ops-select,
+.application-shell .content-container .booking-form-field input,
+.application-shell .content-container .booking-form-field textarea,
+.application-shell .content-container .booking-form-field select,
+.application-shell .content-container .disruption-panel input,
+.application-shell .content-container .disruption-panel textarea,
+.application-shell .content-container .disruption-panel select {
+  border-color: #d7dce0;
+  color: #35404a;
+  background: #fff;
+}
+.application-shell .content-container .ops-field input:focus,
+.application-shell .content-container .ops-field select:focus,
+.application-shell .content-container .ops-field textarea:focus,
+.application-shell .content-container .ops-select:focus,
+.application-shell .content-container .booking-form-field input:focus,
+.application-shell .content-container .booking-form-field textarea:focus,
+.application-shell .content-container .booking-form-field select:focus,
+.application-shell .content-container .disruption-panel input:focus,
+.application-shell .content-container .disruption-panel textarea:focus,
+.application-shell .content-container .disruption-panel select:focus { border-color: #8c969f; box-shadow: 0 0 0 3px rgba(86,97,108,.12); outline: 0; }
+.application-shell .content-container .search-field:focus-within,
+.application-shell .content-container .room-search-field:focus-within,
+.application-shell .content-container .examination-search-field:focus-within,
+.application-shell .content-container .assistant-composer:focus-within { border-color: #aab1b7; box-shadow: 0 0 0 3px rgba(86,97,108,.1); }
+.application-shell .content-container .timetable-filter-control select:focus,
+.application-shell .content-container .timetable-search-input:focus-within,
+.application-shell .content-container .examination-filter-heading button:focus-visible,
+.application-shell .content-container .exam-week-navigation button:focus-visible,
+.application-shell .content-container .exam-view-switch button:focus-visible,
+.application-shell .content-container .analytics-refresh-button:focus-visible,
+.application-shell .content-container .disruption-refresh-button:focus-visible,
+.application-shell .content-container .disruption-validate-button:focus-visible { outline-color: #56616c; }
+
+.application-shell .content-container .ops-button.primary,
+.application-shell .content-container .ops-card .ops-button,
+.application-shell .content-container .ops-record-card .ops-button,
+.application-shell .content-container .ops-toolbar .ops-button,
+.application-shell .content-container .booking-form-panel .ops-button.primary,
+.application-shell .content-container .disruption-panel .ops-button.primary {
+  border-color: #424c56;
+  color: #fff;
+  background: #424c56;
+}
+.application-shell .content-container .ops-button.primary:hover:not(:disabled),
+.application-shell .content-container .ops-card .ops-button:hover:not(:disabled),
+.application-shell .content-container .ops-record-card .ops-button:hover:not(:disabled),
+.application-shell .content-container .ops-toolbar .ops-button:hover:not(:disabled) { border-color: #252d35; background: #252d35; }
+.application-shell .content-container .ops-button:not(.primary):not(.danger) { border-color: #d4d9dd; color: #424d57; background: #fff; }
+.application-shell .content-container .ops-button:not(.primary):not(.danger):hover:not(:disabled) { border-color: #aeb6bd; color: #28323b; background: #f5f6f6; }
+
+.application-shell .content-container .ops-table-wrap,
+.application-shell .content-container .ops-calendar-scroll { border-color: #dfe3e6; background: #fff; }
+.application-shell .content-container .ops-table { color: #35414b; background: rgba(255,255,255,.9); }
+.application-shell .content-container .ops-table th,
+.application-shell .content-container .ops-table td { border-color: #e7eaec; color: #4d5963; }
+.application-shell .content-container .ops-table th { color: #59646e; background: #eef0f1; }
+.application-shell .content-container .ops-table td strong,
+.application-shell .content-container .ops-table td a { color: #28323b; }
+.application-shell .content-container .ops-table tbody tr:hover { background: #f1f3f4; }
+.application-shell .content-container .ops-badge { border-color: #d9dee2; color: #56616b; background: #f0f2f3; }
+
+.application-shell .content-container .academic-timetable-card { background: #fff; }
+.application-shell .content-container .academic-grid-heading { background: linear-gradient(100deg,#fff,#f1f3f4); }
+.application-shell .content-container .academic-grid-heading p.academic-color-key { color: #626d76; }
+.application-shell .content-container .academic-session-block[data-tone="0"] { --academic-course-color: #53616c; }
+.application-shell .content-container .academic-session-block[data-tone="1"] { --academic-course-color: #718078; }
+.application-shell .content-container .academic-session-block[data-tone="2"] { --academic-course-color: #8a806d; }
+.application-shell .content-container .academic-session-block[data-tone="3"] { --academic-course-color: #73777b; }
+.application-shell .content-container .academic-session-block[data-tone="4"] { --academic-course-color: #66747d; }
+.application-shell .content-container .academic-session-block[data-tone="5"] { --academic-course-color: #8c736c; }
+.application-shell .content-container .academic-day-heading.is-today { background: #eceff0; }
+.application-shell .content-container .academic-day-heading.is-today em { border-color: #aeb6bc; color: #48535c; background: #e2e6e8; }
+.application-shell .content-container .academic-week-navigation button:hover { color: #39434c; background: #edf0f1; }
+
+.application-shell .content-container .booking-form-panel,
+.application-shell .content-container .booking-requests-panel,
+.application-shell .content-container .disruption-panel,
+.application-shell .content-container .disruption-flow { color: var(--bento-ink); }
+.application-shell .content-container .disruption-panel-icon,
+.application-shell .content-container .assistant-avatar,
+.application-shell .content-container .assistant-welcome-icon,
+.application-shell .content-container .assistant-side-heading > span,
+.application-shell .content-container .analytics-insight-icon,
+.application-shell .content-container .analytics-report-icon {
+  border-color: #dfe3e6;
+  color: #525e68;
+  background: #eceff0;
+}
+
+.application-shell .content-container .assistant-command-popover {
+  border-color: #cfd5da;
+  color: #303a43;
+  background: linear-gradient(145deg, #fff 0%, #f0f2f3 100%);
+  box-shadow: 0 18px 42px rgba(32,40,49,.17), 0 2px 8px rgba(32,40,49,.06);
+}
+.application-shell .content-container .ops-card:has(.assistant-command-root) { overflow: visible; }
+.application-shell .content-container .assistant-command-group h3 { color: #68737d; }
+.application-shell .content-container .assistant-command-footer {
+  border-color: #dfe3e6;
+  color: #68737d;
+  background: rgba(239,241,242,.98);
+}
+.application-shell .content-container .assistant-command-footer kbd {
+  border-color: #d3d9dd;
+  color: #56616c;
+  background: #fff;
+}
+.application-shell .content-container .assistant-autocomplete-group h3 { color: #59646e; }
+.application-shell .content-container .assistant-autocomplete-icon { border-color: #d8dde1; color: #fff; background: #56616c; }
+.application-shell .content-container .assistant-autocomplete-option:hover,
+.application-shell .content-container .assistant-autocomplete-option.is-active { border-color: #d0d5d9; background: #eff1f2; }
+.application-shell .content-container .assistant-autocomplete-copy strong { color: #303a43; }
+.application-shell .content-container .assistant-memory-indicator.is-enabled { color: #4d5862; }
+.application-shell .content-container .assistant-memory-indicator small { background: #69747e; }
+.application-shell .content-container .assistant-memory-panel { border-color: rgba(255,255,255,.2); background: #39434c; }
+.application-shell .content-container .assistant-memory-toggle { border-color: #d6dce0; color: #4d5862; background: #f7f8f8; }
+.application-shell .content-container .assistant-composer { border-color: #e1e5e8; background: #f8f9f9; }
+.application-shell .content-container .assistant-refresh-button,
+.application-shell .content-container .assistant-suggestion-list button { border-color: #e1e5e8; color: #5b6670; background: #fff; }
+.application-shell .content-container .assistant-suggestion-list button:hover { border-color: #cbd1d6; color: #39434c; background: #f1f3f4; }
+.application-shell .content-container .assistant-status-pill.is-checking i { background: #7b858d; }
+.application-shell .content-container .disruption-flow-step:first-child .disruption-flow-icon,
+.application-shell .content-container .disruption-panel-icon,
+.application-shell .content-container .assistant-welcome-icon,
+.application-shell .content-container .assistant-side-heading > span { border-color: #dfe3e6; color: #56616c; background: #eceff0; }
+.application-shell .content-container .examination-calendar-empty button,
+.application-shell .content-container .examination-empty-state button { color: #56616c; }
+.application-shell .content-container .examination-card { border-color: #dfe3e6; border-left-color: #65717c; color: #59646e; background: #f1f3f4; }
+.application-shell .content-container .examination-card:hover,
+.application-shell .content-container .examination-card:focus-visible { border-color: #bdc5cb; background: #fff; }
+.application-shell .content-container .examination-card-footer { color: #59646e; }
+
+.application-shell .content-container .wheel-time-trigger,
+.application-shell .content-container .wheel-time-popover,
+.application-shell .content-container .wheel-time-card { color: #fff; background-color: #39434c; }
+.application-shell .content-container .wheel-time-selection { background: rgba(255,255,255,.13); }
+.application-shell .content-container .wheel-time-done { border-color: rgba(255,255,255,.3); background: #56616c; }
+.application-shell .content-container .week-day-heading.is-selected strong { background: #56616c; }
+.application-shell .content-container .examination-dialog-header button:focus-visible,
+.application-shell .content-container .venue-primary-button:focus-visible,
+.application-shell .content-container .venue-refresh-button:focus-visible,
+.application-shell .content-container .venue-secondary-button:focus-visible,
+.application-shell .content-container .venue-text-button:focus-visible,
+.application-shell .content-container .room-view-switch button:focus-visible,
+.application-shell .content-container .venue-icon-refresh:focus-visible { outline-color: #56616c; }
+
+.application-shell .content-container :focus-visible { outline-color: var(--bento-focus); }
+.application-shell .content-container .magic-bento::before { opacity: .12; }
+.application-shell .content-container .magic-bento:hover::before { opacity: .85; }
+.application-shell .content-container .magic-bento-spotlight { background: linear-gradient(145deg,#fff,#f1f3f4); }
+.application-shell .content-container .magic-bento-layered { background: linear-gradient(145deg,#fff,#eff1f2); }
+.application-shell .content-container .magic-bento-action { background: linear-gradient(135deg,#fff,#e8ebed); }
+.application-shell .content-container .magic-bento-data { background: #fff; }
+
+/* Keep older authenticated controls in the same graphite accent family. */
+.application-shell .content-container .ops-link,
+.application-shell .content-container .text-link,
+.application-shell .content-container .dashboard-refresh-button:hover:not(:disabled),
+.application-shell .content-container .today-button:hover,
+.application-shell .content-container .timetable-refresh-button:hover:not(:disabled),
+.application-shell .content-container .clear-filters-button:hover:not(:disabled),
+.application-shell .content-container .inline-clear-button,
+.application-shell .content-container .session-detail-kind,
+.application-shell .content-container .academic-today-button,
+.application-shell .content-container .academic-week-navigation span svg { color: #56616c; }
+.application-shell .content-container .text-link:hover,
+.application-shell .content-container .academic-today-button:hover { color: #37414a; }
+.application-shell .content-container .dashboard-refresh-button:hover:not(:disabled),
+.application-shell .content-container .today-button:hover,
+.application-shell .content-container .timetable-refresh-button:hover:not(:disabled),
+.application-shell .content-container .clear-filters-button:hover:not(:disabled),
+.application-shell .content-container .academic-today-button:hover,
+.application-shell .content-container .week-day-heading:hover { border-color: #c6ccd1; background-color: #f1f3f4; }
+.application-shell .content-container .timetable-state-banner code,
+.application-shell .content-container .session-card-heading,
+.application-shell .content-container .session-dialog-close:hover { color: #4b5661; }
+.application-shell .content-container .state-banner-mark,
+.application-shell .content-container .timetable-view-switch button.is-active,
+.application-shell .content-container .filter-toggle-button:hover,
+.application-shell .content-container .filter-toggle-button.is-active,
+.application-shell .content-container .week-day-heading.is-selected strong,
+.application-shell .content-container .session-detail-kind { border-color: #d2d7db; color: #4b5661; background: #eaedef; }
+.application-shell .content-container .filter-active-dot { background: #68737d; }
+.application-shell .content-container .loading-ring { border-color: #dfe3e6; border-top-color: #68737d; }
+.application-shell .content-container .timetable-session-card { border-color: #d9dee2; border-left-color: #68737d; color: #4b5661; background: #f1f3f4; }
+.application-shell .content-container .timetable-session-card:hover,
+.application-shell .content-container .timetable-session-card:focus-visible { border-color: #aeb6bd; box-shadow: 0 4px 10px rgba(32,40,49,.11); }
+.application-shell .content-container .session-dialog-close:hover { background: #f1f3f4; }
+.application-shell .content-container .academic-today-button { border-color: #d4d9dd; background: #f5f6f6; }
+
+.magic-bento { --bento-x: 50%; --bento-y: 0%; position: relative; isolation: isolate; overflow: hidden; border: 1px solid var(--bento-border); border-radius: 12px; color: var(--bento-ink); background: var(--bento-surface); box-shadow: var(--bento-shadow); transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease; }
+.magic-bento-spotlight { background: linear-gradient(145deg,#fff,#f1f3f4); }
+.magic-bento-layered { background: linear-gradient(145deg,rgba(255,255,255,.97),rgba(239,241,242,.9)); }
+.magic-bento-action { background: linear-gradient(135deg,#fff,#e9ecee); }
+.magic-bento-data { background: #fff; }
+.magic-bento > * { position: relative; z-index: 1; }
+.magic-bento:hover { border-color: #bdc4ca; box-shadow: 0 14px 34px rgba(32,40,49,.11); transform: translateY(-2px); }
+.magic-bento:active { transform: translateY(0) scale(.997); }
+
+@media (max-width: 640px) {
+  .magic-bento:hover { transform: none; }
+  .application-shell .content-container .ops-card,
+  .application-shell .content-container .ops-record-card,
+  .application-shell .content-container .ops-stat { box-shadow: 0 5px 16px rgba(32,40,49,.055); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .magic-bento, .application-shell .content-container .ops-card,
+  .application-shell .content-container .ops-record-card,
+  .application-shell .content-container .ops-stat { transition: none; }
+  .magic-bento:hover { transform: none; }
+}

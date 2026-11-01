@@ -65,12 +65,14 @@ export const SmoothInput = forwardRef<HTMLInputElement, SmoothInputProps>(functi
     const textWidth = context.measureText(measuredText).width + Math.max(0, measuredText.length - 1) * letterSpacing
     const borderLeft = Number.parseFloat(computed.borderLeftWidth) || 0
     const paddingLeft = Number.parseFloat(computed.paddingLeft) || 0
-    const x = borderLeft + paddingLeft + textWidth - input.scrollLeft
+    const x = input.offsetLeft + borderLeft + paddingLeft + textWidth - input.scrollLeft
     const fontSize = Number.parseFloat(computed.fontSize) || 16
-    const lineHeight = Number.parseFloat(computed.lineHeight) || fontSize * 1.2
     const borderTop = Number.parseFloat(computed.borderTopWidth) || 0
-    const paddingTop = Number.parseFloat(computed.paddingTop) || 0
-    const y = borderTop + paddingTop + Math.max(0, (lineHeight - fontSize) / 2)
+    const borderBottom = Number.parseFloat(computed.borderBottomWidth) || 0
+    // Single-line inputs center their text in the control even when line-height is `normal`.
+    // Center the animated caret from the actual input box instead of guessing its line box.
+    const contentHeight = input.clientHeight - borderTop - borderBottom
+    const y = input.offsetTop + borderTop + Math.max(0, (contentHeight - fontSize) / 2)
     const visible = x >= borderLeft && x <= input.clientWidth - (Number.parseFloat(computed.paddingRight) || 0)
     const prefersMotionReduction = window.matchMedia('(prefers-reduced-motion: reduce)').matches
 

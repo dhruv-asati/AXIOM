@@ -26,8 +26,8 @@
   width: 2px;
   height: 1em;
   border-radius: 2px;
-  background: #5269ce;
-  box-shadow: 0 0 7px rgba(82, 105, 206, .42);
+  background: var(--accent, #56616c);
+  box-shadow: 0 0 7px rgba(86, 97, 108, .28);
   opacity: 0;
   pointer-events: none;
   will-change: transform, opacity;

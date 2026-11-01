@@ -22,7 +22,7 @@ export function SpecularCard({ as = 'article', className = '', children, shineSi
   return createElement(as, {
     ...props,
     ref: elementRef,
-    className: `specular-card${className ? ` ${className}` : ''}`,
+    className: `specular-card magic-bento magic-bento-spotlight${className ? ` ${className}` : ''}`,
     'data-specular-manual': '',
     children,
   })

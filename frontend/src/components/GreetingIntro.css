@@ -45,7 +45,8 @@
   z-index: 2;
   top: 50%;
   left: 50%;
-  max-width: calc(100vw - 32px);
+  width: max-content;
+  max-width: calc(100vw - 48px);
   color: #fff;
   font-family: 'Noto Sans Gurmukhi', 'Noto Sans Kannada', Inter, ui-sans-serif, system-ui, sans-serif;
   font-size: clamp(32px, 5vw, 64px);
@@ -53,7 +54,8 @@
   letter-spacing: -.035em;
   line-height: 1.2;
   text-align: center;
-  white-space: nowrap;
+  white-space: normal;
+  text-wrap: balance;
   transform: translate(-50%, -50%);
   will-change: opacity, transform;
 }

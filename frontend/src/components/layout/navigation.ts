@@ -1,14 +1,14 @@
 import {
   BarChart3,
+  Building2,
   Bot,
   BookOpenCheck,
+  CalendarCheck2,
   CalendarDays,
   Database,
   LayoutDashboard,
   Settings2,
   ShieldAlert,
-  TicketCheck,
-  Warehouse,
   type LucideIcon,
 } from 'lucide-react'
 import type { UserRole } from '../../auth/AuthContext'
@@ -29,8 +29,8 @@ export const primaryNavigation: NavigationEntry[] = [
   { id: 'overview', label: 'Overview', to: '/dashboard', icon: LayoutDashboard, roles: admin },
   { id: 'datasets', label: 'Datasets', to: '/datasets', icon: Database, roles: admin },
   { id: 'timetable', label: 'Timetable', to: '/timetable', icon: CalendarDays, roles: teaching },
-  { id: 'rooms', label: 'Room Management', to: '/rooms', icon: Warehouse, roles: venue },
-  { id: 'bookings', label: 'Bookings', to: '/bookings', icon: TicketCheck, roles: venue },
+  { id: 'rooms', label: 'Room Management', to: '/rooms', icon: Building2, roles: venue },
+  { id: 'bookings', label: 'Bookings', to: '/bookings', icon: CalendarCheck2, roles: venue },
   { id: 'examinations', label: 'Examinations', to: '/examinations', icon: BookOpenCheck, roles: adminDepartment },
   { id: 'disruptions', label: 'Disruptions', to: '/disruptions', icon: ShieldAlert, roles: teaching },
   { id: 'assistant', label: 'Assistant', to: '/assistant', icon: Bot, roles: teaching },

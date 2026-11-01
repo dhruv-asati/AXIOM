@@ -12,6 +12,8 @@ import { getDataset } from '../api/datasets'
 import type { DatasetCalendar } from '../types/api'
 import { canApproveDepartmentLabs, canReviewClassMoveBookings } from '../auth/roleAccess.mjs'
 import { SmoothInput } from '../components/ui/SmoothInput'
+import { WheelTimePicker } from '../components/WheelTimePicker'
+import { periodClockSlots, periodClockTime, periodForClockTime } from '../lib/timeSlots'
 
 export function BookingsPage() {
   const { user } = useAuth()
@@ -221,6 +223,12 @@ export function BookingsPage() {
   const selectedMoveRequest = moveableRequests.find((item) => item.request_id === moveRequestId)
   const moveRooms = selectedMoveRequest ? eventRooms.filter((room) => selectedMoveRequest.room_types.includes(room.room_type)) : []
   const moveSlots = selectedMoveRequest ? selectedMoveRequest.windows.flatMap((window) => Array.from({ length: Math.max(0, window.to_period - window.from_period - selectedMoveRequest.duration_periods + 2) }, (_, index) => ({ day: window.day, start: window.from_period + index }))) : []
+  const moveDays = [...new Set(moveSlots.map((slot) => slot.day))]
+  const moveTimeSlots = moveSlots.filter((slot) => slot.day === moveDay)
+  const movePeriods = calendar?.periods.filter((period) => moveTimeSlots.some((slot) => slot.start === period.id)) ?? []
+  const selectedMoveTime = periodClockTime(movePeriods.find((period) => period.id === Number(moveStart)))
+  const startWindowTime = periodClockTime(calendar?.periods.find((period) => period.id === Number(fromPeriod)))
+  const endWindowTime = periodClockTime(calendar?.periods.find((period) => period.id === Number(toPeriod)), 'end')
   return <div className="ops-page">
     <PageHeader eyebrow="VENUE REQUESTS" title="Bookings" description={bookingDescription} />
     <section className="ops-toolbar">
@@ -241,7 +249,7 @@ export function BookingsPage() {
         return <article className="ops-record-card" key={request.request_id}><header><h3>{request.title}</h3><span className="ops-badge">Pending</span></header><p>{request.requester} · {request.department} · attendance {request.attendance}</p><p className="ops-mono">{request.request_id}</p>{isOwn && <div className="ops-callout">You created this request, so you cannot decide it.</div>}<div className="ops-fields">
           <label className="ops-field">Department lab<select value={choice.room_id} onChange={(event) => updateLabChoice(request.request_id, { room_id: event.target.value })}><option value="">Select lab</option>{rooms.map((room) => <option key={room.room_id} value={room.room_id}>{room.name} · {room.room_id} · cap {room.capacity}</option>)}</select></label>
           <label className="ops-field">Day<select value={choice.day} onChange={(event) => { const nextDay = event.target.value; const nextWindow = request.windows.find((window) => window.day === nextDay); updateLabChoice(request.request_id, { day: nextDay, start_period: nextWindow?.from_period ?? 1 }) }}>{days.map((day) => <option key={day}>{day}</option>)}</select></label>
-          <label className="ops-field">Start period<select value={choice.start_period} onChange={(event) => updateLabChoice(request.request_id, { start_period: Number(event.target.value) })}>{starts.map((period) => <option key={period} value={period}>P{period}</option>)}</select></label>
+          <label className="ops-field">Start time<WheelTimePicker variant="popover" label={`${request.title} start time`} value={periodClockTime(calendar?.periods.find((period) => period.id === choice.start_period)) || '09:00'} slots={periodClockSlots(calendar?.periods.filter((period) => starts.includes(period.id)) ?? [])} disabled={starts.length === 0} onChange={(time) => { const match = periodForClockTime(calendar?.periods.filter((period) => starts.includes(period.id)) ?? [], time); if (match) updateLabChoice(request.request_id, { start_period: match.id }) }} /></label>
         </div><div className="ops-button-row"><button className="ops-button primary" type="button" disabled={approving || isOwn || !choice.room_id || starts.length === 0} onClick={() => void reviewLabBooking(request.request_id, 'approve')}><Check size={14} />Approve</button><button className="ops-button danger" type="button" disabled={approving || isOwn} onClick={() => void reviewLabBooking(request.request_id, 'reject')}>Reject</button></div></article>
       })}</div>}
     </section>}
@@ -250,7 +258,8 @@ export function BookingsPage() {
       {moveableRequests.length === 0 ? <div className="ops-empty"><strong>No eligible requests</strong><span>Submit a booking request first. Only your own non-cancelled requests can be sent for class-move review.</span></div> : <div className="ops-fields">
         <label className="ops-field">Your booking request<select value={moveRequestId} onChange={(event) => { setMoveRequestId(event.target.value); setMoveRoomId(''); setMoveDay(''); setMoveStart('') }}><option value="">Select request</option>{moveableRequests.map((item) => <option key={item.request_id} value={item.request_id}>{item.title} · {item.request_id}</option>)}</select></label>
         <label className="ops-field">Requested event room<select value={moveRoomId} onChange={(event) => setMoveRoomId(event.target.value)}><option value="">Select room</option>{moveRooms.map((room) => <option key={room.room_id} value={room.room_id}>{room.name} · {room.room_id}</option>)}</select></label>
-        <label className="ops-field">Requested time<select value={`${moveDay}|${moveStart}`} onChange={(event) => { const [day, start] = event.target.value.split('|'); setMoveDay(day); setMoveStart(start) }}><option value="|">Select a submitted window</option>{moveSlots.map((slot) => <option key={`${slot.day}-${slot.start}`} value={`${slot.day}|${slot.start}`}>{slot.day} · P{slot.start}</option>)}</select></label>
+        <label className="ops-field">Requested day<select value={moveDay} onChange={(event) => { const nextDay = event.target.value; setMoveDay(nextDay); const firstSlot = moveSlots.find((slot) => slot.day === nextDay); setMoveStart(firstSlot ? String(firstSlot.start) : '') }}><option value="">Select day</option>{moveDays.map((day) => <option key={day} value={day}>{day}</option>)}</select></label>
+        <label className="ops-field">Requested start time<WheelTimePicker variant="popover" label="Requested class-move start time" value={selectedMoveTime || '09:00'} slots={periodClockSlots(movePeriods)} disabled={!moveDay || movePeriods.length === 0} onChange={(time) => { const match = periodForClockTime(movePeriods, time); if (match) setMoveStart(String(match.id)) }} /></label>
         <button className="ops-button primary" type="button" disabled={approving || !moveRequestId || !moveRoomId || !moveDay || !moveStart} onClick={() => void submitClassMove()}>{approving ? 'Generating…' : 'Generate admin proposal'}</button>
       </div>}
     </section>}
@@ -269,8 +278,8 @@ export function BookingsPage() {
         <label className="ops-field">Attendance<input type="number" min="1" max="100000" required value={attendance} onChange={(event) => setAttendance(event.target.value)} /></label>
         <label className="ops-field">Duration (periods)<input type="number" min="1" max="13" required value={duration} onChange={(event) => setDuration(event.target.value)} /></label>
         <label className="ops-field">Day<select required value={requestDay} onChange={(event) => setRequestDay(event.target.value)}>{calendar.days.filter((day) => ['MON', 'TUE', 'WED', 'THU', 'FRI'].includes(day)).map((day) => <option key={day} value={day}>{day}</option>)}</select></label>
-        <label className="ops-field">Window starts at<select required value={fromPeriod} onChange={(event) => setFromPeriod(event.target.value)}>{calendar.periods.map((period) => <option key={period.id} value={period.id}>Period {period.id}{period.start ? ` · ${period.start}` : ''}</option>)}</select></label>
-        <label className="ops-field">Window ends at<select required value={toPeriod} onChange={(event) => setToPeriod(event.target.value)}>{calendar.periods.map((period) => <option key={period.id} value={period.id}>Period {period.id}{period.end ? ` · ${period.end}` : ''}</option>)}</select></label>
+        <label className="ops-field">Window starts at<WheelTimePicker variant="popover" label="Request window start time" value={startWindowTime || periodClockTime(calendar.periods[0]) || '09:00'} slots={periodClockSlots(calendar.periods)} onChange={(time) => { const match = periodForClockTime(calendar.periods, time); if (match) setFromPeriod(String(match.id)) }} /></label>
+        <label className="ops-field">Window ends at<WheelTimePicker variant="popover" label="Request window end time" value={endWindowTime || periodClockTime(calendar.periods.at(-1), 'end') || '17:00'} slots={periodClockSlots(calendar.periods, 'end')} onChange={(time) => { const match = periodForClockTime(calendar.periods, time, 'end'); if (match) setToPeriod(String(match.id)) }} /></label>
         <label className="ops-field">Room type<select required value={requestRoomType} onChange={(event) => setRequestRoomType(event.target.value)}>{eventRoomTypes.map((type) => <option key={type} value={type}>{type}</option>)}</select></label>
         <button className="ops-button primary" type="submit" disabled={requesting || !requestTitle.trim()}>{requesting ? 'Submitting…' : 'Submit for review'}</button>
       </form>}

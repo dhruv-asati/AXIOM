@@ -142,15 +142,26 @@
   margin: 0 0 17px;
 }
 
-.login-team .hover-member { max-width: 570px; }
-.login-team .hover-member-avatar { width: clamp(32px, 3.4vw, 43px); height: clamp(32px, 3.4vw, 43px); }
-.login-team .hover-member-word { height: clamp(82px, 9vw, 120px); font-size: clamp(82px, 9vw, 120px); }
-.login-team .hover-member-cursor { width: 52px; height: 52px; }
+.login-team .hover-member { --member-accent-color: #8eacff; --member-cursor-color: #5273d8; max-width: 570px; overflow: visible; padding-top: 20px; }
+.login-team .hover-member-avatar-row { min-height: 62px; gap: clamp(9px, 1.4vw, 16px); }
+.login-team .hover-member-avatar { width: clamp(44px, 4.6vw, 56px); height: clamp(44px, 4.6vw, 56px); border-color: rgba(255,255,255,.76); border-radius: 13px; box-shadow: 0 5px 18px rgba(5,15,30,.22); transition: transform .38s cubic-bezier(.22,1,.36,1), box-shadow .38s ease; }
+.login-team .hover-member-avatar:hover,
+.login-team .hover-member-avatar:focus-visible,
+.login-team .hover-member-avatar.is-active { transform: translateY(-5px) scale(1.24); }
+.login-team .hover-member-word { height: clamp(38px, 4.5vw, 54px); margin-top: 2px; font-size: clamp(20px, 2.8vw, 32px); letter-spacing: .09em; }
+.login-team .hover-member-cursor { display: none; }
+.login-team .hover-member-description { max-width: 440px; min-height: 0; margin: 5px auto 0; color: #d4ddeb; font-size: 11px; line-height: 1.55; text-shadow: 0 1px 5px rgba(9,20,36,.2); }
 
 @media (max-width: 720px) {
   .hover-member-avatar { width: clamp(36px, 9vw, 64px); height: clamp(36px, 9vw, 64px); }
   .hover-member-word { height: clamp(56px, 16.1vw, 98px); font-size: clamp(56px, 16.1vw, 98px); }
-  .login-team { display: none; }
+  .login-team { display: block; margin: 4px 0 0; }
+  .login-team .hover-member { padding-top: 0; }
+  .login-team .hover-member { padding-top: 15px; }
+  .login-team .hover-member-avatar-row { min-height: 46px; gap: 8px; }
+  .login-team .hover-member-avatar { width: 38px; height: 38px; }
+  .login-team .hover-member-word { height: 32px; font-size: 20px; }
+  .login-team .hover-member-description { font-size: 9px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

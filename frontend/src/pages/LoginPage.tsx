@@ -7,7 +7,7 @@ import './PublicPages.css'
 import { HoverMember } from '../components/HoverMember'
 import { SmoothInput } from '../components/ui/SmoothInput'
 import { AnimatedLink } from '../components/ui/AnimatedLink'
-import { PLACEHOLDER_TEAM_MEMBERS } from '../components/teamMembers'
+import { AXIOM_ROLE_PROFILES } from '../components/teamMembers'
 import { armGreetingIntro } from '../lib/greetingIntro'
 
 export function LoginPage() {
@@ -34,7 +34,7 @@ export function LoginPage() {
     } finally { setSubmitting(false) }
   }
 
-  return <main className="login-page"><section className="login-aside"><Link className="public-brand light" to="/"><span className="public-brand-mark">A</span><span>AXIOM<span className="brand-period">.</span></span></Link><div className="login-aside-copy"><span className="public-eyebrow">CAMPUS OPERATIONS, CONNECTED</span><h1>Everything in<br /><em>its right place.</em></h1><p>Sign in to your campus workspace to review schedules, spaces and the decisions that connect them.</p><div className="login-aside-rule"><LockKeyhole size={17} /><span>Secure, role-aware access</span></div></div><div className="login-team"><HoverMember teamMembers={PLACEHOLDER_TEAM_MEMBERS} /></div><small>Intelligent campus scheduling & venue management</small></section>
+  return <main className="login-page"><section className="login-aside"><Link className="public-brand light" to="/"><span className="public-brand-mark">A</span><span>AXIOM<span className="brand-period">.</span></span></Link><div className="login-aside-copy"><span className="public-eyebrow">CAMPUS OPERATIONS, CONNECTED</span><h1>Everything in<br /><em>its right place.</em></h1><p>Sign in to your campus workspace to review schedules, spaces and the decisions that connect them.</p><div className="login-aside-rule"><LockKeyhole size={17} /><span>Secure, role-aware access</span></div></div><div className="login-team"><HoverMember teamMembers={AXIOM_ROLE_PROFILES} brandText="" groupLabel="AXIOM user roles" showDescription animateText={false} /></div><small>Intelligent campus scheduling & venue management</small></section>
     <section className="login-panel"><AnimatedLink className="login-back" variant="center" to="/"><ArrowLeft size={15} /> Back to AXIOM</AnimatedLink><div className="login-form-wrap"><div className="login-form-heading"><span className="public-eyebrow">WELCOME BACK</span><h2>Sign in to AXIOM</h2><p>Use the account provided for your campus role.</p></div>
       {error && <div className="login-error" role="alert">{error}</div>}
       <form onSubmit={submit} className="login-form"><label htmlFor="username">Email or username</label><SmoothInput autoComplete="username" id="username" name="username" value={username} onChange={(e) => setUsername(e.target.value)} required maxLength={120} autoFocus />

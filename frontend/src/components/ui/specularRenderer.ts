@@ -85,7 +85,7 @@ function compileShader(gl: WebGL2RenderingContext, type: number, source: string)
 }
 
 function readTint(element: HTMLElement, tint?: string): [number, number, number] {
-  const raw = (tint ?? getComputedStyle(element).getPropertyValue('--accent') ?? '#7188df').trim()
+  const raw = (tint ?? getComputedStyle(element).getPropertyValue('--accent') ?? '#56616c').trim()
   const hex = raw.match(/^#([\da-f]{3}|[\da-f]{6})$/i)
   if (hex) {
     const digits = hex[1].length === 3 ? [...hex[1]].map((digit) => digit + digit).join('') : hex[1]
@@ -93,7 +93,7 @@ function readTint(element: HTMLElement, tint?: string): [number, number, number]
   }
   const rgb = raw.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i)
   if (rgb) return [Number(rgb[1]) / 255, Number(rgb[2]) / 255, Number(rgb[3]) / 255]
-  return [0.29, 0.4, 0.85]
+  return [0.34, 0.38, 0.42]
 }
 
 function markFallback(record: SurfaceRecord, enabled: boolean) {

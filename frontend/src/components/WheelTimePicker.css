@@ -1,0 +1,124 @@
+.wheel-time-picker-inline,
+.wheel-time-picker-popover-anchor { position: relative; width: 100%; min-width: 0; }
+.wheel-time-trigger {
+  display: inline-flex;
+  min-width: 132px;
+  width: 100%;
+  min-height: 42px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 13px;
+  border: 1px solid #cbd1d6;
+  border-radius: 7px;
+  color: #fff;
+  background: #424c56;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.wheel-time-trigger:focus-visible,
+.wheel-time-done:focus-visible { outline: 3px solid rgba(86,97,108,.35); outline-offset: 2px; }
+.wheel-time-trigger:disabled { cursor: not-allowed; opacity: .55; }
+.wheel-time-popover {
+  width: 336px;
+  max-width: calc(100vw - 16px);
+  padding: 8px;
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 20px;
+  color: #fff;
+  background: #39434c;
+  box-shadow: 0 22px 65px rgba(25,32,38,.28);
+}
+.wheel-time-card {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  padding: 12px 7px 10px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.18);
+  border-radius: 20px;
+  color: #fff;
+  background: #39434c;
+}
+.wheel-time-popover .wheel-time-card { border: 0; padding-inline: 0; }
+.wheel-time-selection {
+  position: absolute;
+  z-index: 0;
+  top: calc(50% + 8px);
+  right: 11px;
+  left: 11px;
+  height: 36px;
+  border-radius: 12px;
+  background: rgba(255,255,255,.13);
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+.wheel-time-columns { position: relative; z-index: 1; display: grid; grid-template-columns: 1fr 1fr .7fr; gap: 2px; }
+.wheel-time-column-wrap { position: relative; min-width: 0; }
+.wheel-time-column-label { height: 16px; color: rgba(255,255,255,.62); font-size: 8px; font-weight: 650; letter-spacing: .13em; text-align: center; }
+.wheel-time-column {
+  height: 252px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-width: none;
+  scroll-snap-type: y mandatory;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 19%, #000 81%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 19%, #000 81%, transparent 100%);
+  perspective: 600px;
+  touch-action: pan-y;
+}
+.wheel-time-column::-webkit-scrollbar { display: none; }
+.wheel-time-options { display: grid; grid-auto-rows: 36px; }
+.wheel-time-option {
+  display: grid;
+  width: 100%;
+  height: 36px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  color: rgba(255,255,255,.76);
+  background: transparent;
+  font-family: inherit;
+  font-size: calc(22px - var(--wheel-distance) * 1.5px);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  opacity: calc(.76 - var(--wheel-distance) * .18);
+  scroll-snap-align: center;
+  transform: rotateX(calc(var(--wheel-distance) * 7deg)) scale(calc(1 - var(--wheel-distance) * .035));
+  transition: color .16s ease, opacity .16s ease, font-size .16s ease, transform .16s ease;
+  cursor: pointer;
+}
+.wheel-time-option.is-selected { color: #fff; font-size: 28px; font-weight: 730; opacity: 1; transform: rotateX(0) scale(1); }
+.wheel-time-option.is-dimmed { opacity: .22; }
+.wheel-time-option:disabled { cursor: default; }
+.wheel-time-tick { position: absolute; z-index: 2; top: calc(50% + 8px); color: rgba(255,255,255,.68); font-size: 12px; pointer-events: none; transform: translateY(-50%); }
+.wheel-time-tick-left { left: 3px; }
+.wheel-time-tick-right { right: 3px; }
+.wheel-time-done {
+  display: block;
+  width: 100%;
+  min-height: 40px;
+  margin-top: 5px;
+  border: 1px solid rgba(255,255,255,.42);
+  border-radius: 11px;
+  color: #fff;
+  background: #56616c;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.wheel-time-done:hover { background: #65717c; }
+@media (max-width: 420px) {
+  .wheel-time-popover { width: calc(100vw - 16px); padding: 5px; }
+  .wheel-time-card { padding-inline: 4px; }
+  .wheel-time-column-label { font-size: 7px; }
+  .wheel-time-option.is-selected { font-size: 26px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wheel-time-column { scroll-behavior: auto; perspective: none; }
+  .wheel-time-option { transform: none; transition: opacity .01ms; }
+}

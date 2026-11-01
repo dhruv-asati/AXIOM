@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
-import { AlertCircle, CalendarDays, Clock3, LoaderCircle, Play, RefreshCw } from 'lucide-react'
+import { AlertCircle, CalendarDays, ChevronLeft, ChevronRight, Clock3, LoaderCircle, MapPin, Play, RefreshCw, Users } from 'lucide-react'
 import { PageHeader } from '../components/layout/PageHeader'
 import { SessionDetailsDialog } from '../components/timetable/SessionDetailsDialog'
 import { useDatasetContext } from '../context/DatasetContext'
@@ -8,17 +8,31 @@ import { invalidateApiCache } from '../api/client'
 import { generateTimetable, getAssignments, listSchedules } from '../api/resources'
 import type { DatasetCalendar, ScheduleSummary, TimetableAssignment } from '../types/api'
 import type { TimetableSession } from '../types/timetable'
-import { mondayOfWeek, formatDate } from '../lib/timetableTime'
+import { addLocalDays, mondayOfWeek, formatDate, formatWeekRange, sameLocalDate } from '../lib/timetableTime'
 import './Operations.css'
 import { SkeletonPage, SkeletonStats, SkeletonTable, SkeletonTimetable } from '../components/ui/Skeleton'
 import { useAuth } from '../auth/AuthContext'
+
+const sessionToneCount = 6
+
+function courseTone(courseCode: string) {
+  let hash = 0
+  for (const character of courseCode) hash = (hash * 31 + character.charCodeAt(0)) | 0
+  return Math.abs(hash) % sessionToneCount
+}
+
+function sessionKindLabel(kind: TimetableSession['kind']) {
+  return kind === 'lab' ? 'Laboratory' : kind === 'tutorial' ? 'Tutorial' : kind === 'lecture' ? 'Lecture' : 'Session'
+}
+
+type TimetableGridRow = { kind: 'period'; id: number; start?: string; end?: string; teaching?: boolean } | { kind: 'lunch' }
 
 function toDisplaySession(row: TimetableAssignment, calendar: DatasetCalendar): TimetableSession {
   const start = calendar.periods.find((period) => period.id === row.start_period)?.start
   const end = calendar.periods.find((period) => period.id === row.end_period)?.end
   const timeLabel = start && end ? `${start}–${end}` : `P${row.start_period}–P${row.end_period}`
   return {
-    id: row.session_id, day: row.day, startPeriod: row.start_period, durationPeriods: row.duration,
+    id: row.session_id, day: row.day, startPeriod: row.start_period, endPeriod: row.end_period, durationPeriods: row.duration,
     courseCode: row.course_id, courseName: row.course_name, department: row.department,
     facultyId: row.faculty_id, facultyName: row.faculty_name, roomId: row.room_id,
     roomName: row.room_name, studentGroups: row.student_groups, kind: row.kind as TimetableSession['kind'], timeLabel,
@@ -27,7 +41,7 @@ function toDisplaySession(row: TimetableAssignment, calendar: DatasetCalendar): 
 
 export function TimetablePage() {
   const { user } = useAuth()
-  const { selectedDatasetId } = useDatasetContext()
+  const { selectedDatasetId, selectedDataset } = useDatasetContext()
   const timetableDescription = user?.role === 'faculty'
     ? 'Your own weekly assignments and schedule-change requests, filtered to the signed-in faculty account.'
     : user?.role === 'department_coordinator'
@@ -44,6 +58,7 @@ export function TimetablePage() {
   const [selected, setSelected] = useState<TimetableSession | null>(null)
   const [filters, setFilters] = useState({ day: '', faculty_id: '', room_id: '', course_id: '', group_id: '' })
   const [useWarmStart, setUseWarmStart] = useState(true)
+  const [weekStart, setWeekStart] = useState(() => mondayOfWeek(new Date()))
   const [loadedDatasetId, setLoadedDatasetId] = useState('')
   const loadController = useRef<AbortController | null>(null)
 
@@ -120,15 +135,60 @@ export function TimetablePage() {
       .map((row) => toDisplaySession(row, calendar))
   }, [assignments, calendar, filters])
 
-  const periods = (calendar?.periods ?? []).filter((period) => period.teaching).sort((a, b) => a.id - b.id)
+  const periods = (calendar?.periods ?? []).slice().sort((a, b) => a.id - b.id)
   const days = calendar?.days ?? []
   const lunchAfter = calendar?.lunch?.after_period
-  const selectedWeekStart = mondayOfWeek(new Date())
+  const today = new Date()
+  const todayIndex = days.findIndex((_, index) => sameLocalDate(addLocalDays(weekStart, index), today))
+  const todayDay = todayIndex >= 0 ? days[todayIndex] : undefined
+  const weekRange = days.length
+    ? `${formatDate(weekStart, { day: 'numeric', month: 'short' })} – ${formatDate(addLocalDays(weekStart, days.length - 1), { day: 'numeric', month: 'short', year: 'numeric' })}`
+    : formatWeekRange(weekStart)
+  const lunchStart = periods.find((period) => period.id === lunchAfter)?.end
+  const lunchEnd = periods.find((period) => period.id > (lunchAfter ?? Number.POSITIVE_INFINITY))?.start
+  const lunchTime = lunchStart && lunchEnd ? `${lunchStart}–${lunchEnd}` : ''
+  const gridRows = useMemo<TimetableGridRow[]>(() => periods.flatMap((period, index) => {
+    const rows: TimetableGridRow[] = [{ kind: 'period', ...period }]
+    if (lunchAfter === period.id && index < periods.length - 1) rows.push({ kind: 'lunch' })
+    return rows
+  }), [lunchAfter, periods])
+  const gridRowByPeriod = useMemo(() => new Map(gridRows.flatMap((row, index) => row.kind === 'period' ? [[row.id, index + 1] as const] : [])), [gridRows])
+  const dayLayouts = useMemo(() => new Map(days.map((day) => {
+    const ordered = displaySessions.filter((session) => session.day === day)
+      .slice().sort((a, b) => a.startPeriod - b.startPeriod || a.id.localeCompare(b.id))
+    const laneEnds: number[] = []
+    const sessions = ordered.flatMap((session) => {
+      const startPeriod = session.startPeriod
+      const endPeriod = session.endPeriod ?? startPeriod + session.durationPeriods - 1
+      const startRow = gridRowByPeriod.get(startPeriod)
+      const endRow = gridRowByPeriod.get(endPeriod)
+      if (!startRow || !endRow) return []
+      let lane = laneEnds.findIndex((lastPeriod) => lastPeriod < startPeriod)
+      if (lane < 0) lane = laneEnds.length
+      laneEnds[lane] = endPeriod
+      return [{ session, lane, startRow, rowSpan: endRow - startRow + 1 }]
+    })
+    return [day, { sessions, laneCount: Math.max(1, laneEnds.length) }] as const
+  })), [days, displaySessions, gridRowByPeriod])
+  const gridTemplateRows = gridRows.map((row) => row.kind === 'lunch' ? '38px' : 'minmax(112px, 112px)').join(' ')
+  const dayColumnWidths = days.map((day) => Math.max(240, (dayLayouts.get(day)?.laneCount ?? 1) * 132))
+  const dayColumnsTemplate = dayColumnWidths.map((width) => `minmax(${width}px, ${width}fr)`).join(' ')
+  const gridStyle = { gridTemplateColumns: `82px ${dayColumnsTemplate}`, minWidth: `${82 + dayColumnWidths.reduce((total, width) => total + width, 0)}px` } as CSSProperties
   const unique = (values: string[]) => [...new Set(values)].sort((a, b) => a.localeCompare(b))
-  const sessionsForCell = (day: string, period: number) => displaySessions.filter((session) => session.day === day && session.startPeriod === period)
+  const moveWeek = (amount: number) => setWeekStart((current) => addLocalDays(current, amount * 7))
+  const returnToCurrentWeek = () => setWeekStart(mondayOfWeek(new Date()))
 
-  return <div className="ops-page">
-    <PageHeader eyebrow="ACADEMIC OPERATIONS" title="Timetable" description={timetableDescription} />
+  return <div className="ops-page timetable-page">
+    <PageHeader eyebrow="ACADEMIC SCHEDULING" title="Weekly Timetable" description={timetableDescription} action={
+      <div className="academic-week-controls" aria-label="Academic week navigation">
+        <div className="academic-week-navigation">
+          <button type="button" aria-label="Previous week" title="Previous week" onClick={() => moveWeek(-1)}><ChevronLeft size={15} /></button>
+          <span><CalendarDays size={14} aria-hidden="true" />{weekRange}</span>
+          <button type="button" aria-label="Next week" title="Next week" onClick={() => moveWeek(1)}><ChevronRight size={15} /></button>
+        </div>
+        <button className="academic-today-button" type="button" onClick={returnToCurrentWeek}>Today</button>
+      </div>
+    } />
     <section className="ops-toolbar">
       <label className="ops-field">Persisted schedule
         <select value={scheduleId} disabled={!schedules.length || loading} onChange={async (event) => {
@@ -164,21 +224,52 @@ export function TimetablePage() {
         <label className="ops-field">Student group<select value={filters.group_id} onChange={(event) => setFilters((state) => ({ ...state, group_id: event.target.value }))}><option value="">All groups</option>{unique(assignments.flatMap((row) => row.student_groups.map((group) => group.id))).map((value) => <option key={value}>{value}</option>)}</select></label>
         <span className="ops-badge">{displaySessions.length} of {assignments.length} sessions</span>
       </section>
-      {calendar && <section className="ops-card">
-        <div className="ops-card-heading"><div><h2>Weekly timetable grid</h2><p>Viewing a recurring teaching week as of {formatDate(selectedWeekStart, { weekday: 'long', day: 'numeric', month: 'long' })}. Filtered to persisted assignments.</p></div><span className="ops-badge good">{schedules.find((row) => row.schedule_id === scheduleId)?.status ?? 'unknown'}</span></div>
-        {assignments.length === 0 ? <div className="ops-empty"><CalendarDays size={18} /><strong>This schedule has no assignments</strong><span>No timetable rows were returned by the backend.</span></div> : <div className="ops-calendar-scroll"><div className="ops-calendar-grid" style={{ '--day-count': days.length } as CSSProperties}>
-          <div className="ops-calendar-cell heading">PERIOD</div>{days.map((day) => <div className="ops-calendar-cell heading" key={day}>{day}</div>)}
-          {periods.map((period, index) => <div key={`p${period.id}`} style={{ display: 'contents' }}>
-            {index > 0 && lunchAfter === periods[index - 1]?.id && <><div className="ops-calendar-cell period">LUNCH</div>{days.map((day) => <div className="ops-calendar-cell" key={`${day}-lunch`} aria-label={`${day} lunch break`} />)}</>}
-            <div className="ops-calendar-cell period">P{period.id}<br /><span>{period.start ?? ''}</span></div>
-            {days.map((day) => <div className="ops-calendar-cell" key={`${day}-${period.id}`}>{sessionsForCell(day, period.id).map((session) => <button type="button" key={session.id} className={`ops-calendar-session kind-${session.kind}`} onClick={() => setSelected(session)}><strong>{session.courseCode} · {session.courseName}</strong><span>{session.facultyName} · {session.roomName}</span><span>{session.timeLabel} · {session.studentGroups.map((group) => group.id).join(', ')}</span></button>)}</div>)}
-          </div>)}
+      {calendar && <section className="ops-card academic-timetable-card">
+        <div className="ops-card-heading academic-grid-heading"><div><h2>Weekly schedule</h2><p>{selectedDataset?.source_dataset_id ?? 'Selected dataset'} · Recurring campus timetable · {weekRange}</p><p className="academic-color-key">Course colors stay consistent; session type is labeled on every block. Select a block for full details.</p></div><span className="ops-badge good">{schedules.find((row) => row.schedule_id === scheduleId)?.status ?? 'unknown'}</span></div>
+        {assignments.length === 0 ? <div className="ops-empty"><CalendarDays size={18} /><strong>This schedule has no assignments</strong><span>No timetable rows were returned by the backend.</span></div> : <div className="academic-grid-scroll" role="region" aria-label="Weekly timetable grid. Scroll to see every day and period." tabIndex={0}><div className="academic-week-grid" style={gridStyle}>
+          <div className="academic-time-heading">PERIOD <span>TIME</span></div>
+          <div className="academic-day-headings" style={{ gridTemplateColumns: dayColumnsTemplate }}>
+            {days.map((day, index) => {
+              const date = addLocalDays(weekStart, index)
+              return <div className={`academic-day-heading${day === todayDay ? ' is-today' : ''}`} key={day}>
+                <span>{day}</span><strong>{new Intl.DateTimeFormat('en-IN', { day: '2-digit' }).format(date)}</strong><small>{new Intl.DateTimeFormat('en-IN', { month: 'short' }).format(date)}</small>{day === todayDay && <em>Today</em>}
+              </div>
+            })}
+          </div>
+          <div className="academic-period-axis" style={{ gridTemplateRows: gridTemplateRows }}>
+            {gridRows.map((row, index) => row.kind === 'lunch' ? <div className="academic-lunch-axis" key="lunch" style={{ gridRow: index + 1 }}><strong>LUNCH BREAK</strong><span>{lunchTime || 'CAMPUS INTERVAL'}</span></div> : <div className="academic-period-label" key={row.id} style={{ gridRow: index + 1 }}><strong>P{row.id}</strong><span>{row.start ?? ''}{row.end ? `–${row.end}` : ''}</span>{row.teaching === false && <small>EVENT</small>}</div>)}
+          </div>
+          <div className="academic-day-columns" style={{ gridTemplateColumns: dayColumnsTemplate }}>
+            {days.map((day) => {
+              const layout = dayLayouts.get(day) ?? { sessions: [], laneCount: 1 }
+              return <div className={`academic-day-track${day === todayDay ? ' is-today' : ''}`} key={day} aria-label={`${day} schedule`} data-lanes={layout.laneCount} style={{ gridTemplateRows, gridTemplateColumns: `repeat(${layout.laneCount}, minmax(0, 1fr))` }}>
+                {gridRows.map((row, index) => row.kind === 'lunch'
+                  ? <div className="academic-lunch-band" key={`${day}-lunch`} style={{ gridRow: index + 1 }} aria-label={`${day} lunch break`}><span>LUNCH BREAK</span></div>
+                  : <div className={`academic-period-band${index % 2 ? ' is-alternate' : ''}`} key={`${day}-period-${row.id}`} style={{ gridRow: index + 1 }} aria-hidden="true" />)}
+                {layout.sessions.map(({ session, lane, startRow, rowSpan }) => <button
+                  type="button"
+                  key={session.id}
+                  className={`academic-session-block kind-${session.kind}`}
+                  data-tone={courseTone(session.courseCode)}
+                  style={{ gridRow: `${startRow} / span ${rowSpan}`, gridColumn: lane + 1 }}
+                  aria-label={`${session.courseName}, ${session.courseCode}, ${sessionKindLabel(session.kind)}, ${session.facultyName}, ${session.roomName}, ${session.timeLabel}, ${session.studentGroups.map((group) => group.name || group.id).join(', ')}`}
+                  title={`${session.courseName} · ${session.timeLabel}`}
+                  onClick={() => setSelected(session)}
+                >
+                  <span className="academic-session-identifiers"><span className="academic-session-type">{sessionKindLabel(session.kind)}</span><span className="academic-session-code">{session.courseCode}</span></span>
+                  <strong className="academic-session-course">{session.courseName || session.courseCode}</strong>
+                  <span className="academic-session-meta"><Users size={11} aria-hidden="true" />{session.facultyName}<MapPin size={11} aria-hidden="true" />{session.roomName}</span>
+                  <span className="academic-session-groups">{session.studentGroups.map((group) => group.name || group.id).join(' · ')}</span>
+                </button>)}
+              </div>
+            })}
+          </div>
         </div></div>}
       </section>}
       <section className="ops-card"><div className="ops-card-heading"><div><h2>Assignments</h2><p>Course, faculty, room, period, type and student groups from the selected persisted schedule.</p></div></div>
         {displaySessions.length === 0 ? <div className="ops-empty"><Clock3 size={18} /><strong>No assignments match</strong><span>Change or clear the timetable filters.</span></div> : <div className="ops-table-wrap"><table className="ops-table"><thead><tr><th>Course</th><th>Type</th><th>Faculty</th><th>Groups</th><th>Day / periods</th><th>Room</th></tr></thead><tbody>{displaySessions.map((session) => <tr key={session.id} onClick={() => setSelected(session)} style={{ cursor: 'pointer' }}><td>{session.courseCode} · {session.courseName}</td><td>{session.kind}</td><td>{session.facultyName}</td><td className="wrap-cell">{session.studentGroups.map((group) => group.name).join(', ')}</td><td>{session.day} · {session.timeLabel}</td><td>{session.roomName} · {session.roomId}</td></tr>)}</tbody></table></div>}
       </section>
     </>}
-    {selected && <SessionDetailsDialog session={selected} weekStart={selectedWeekStart} onClose={() => setSelected(null)} />}
+    {selected && <SessionDetailsDialog session={selected} weekStart={weekStart} onClose={() => setSelected(null)} />}
   </div>
 }

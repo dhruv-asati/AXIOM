@@ -9,6 +9,7 @@ type HoverMemberProps = {
   brandText?: string
   groupLabel?: string
   showDescription?: boolean
+  animateText?: boolean
 }
 
 type LetterTransition = { from: string; to: string }
@@ -21,11 +22,10 @@ function letters(value: string, className: string) {
   ))
 }
 
-export function HoverMember({ teamMembers, brandText = 'AXIOM', groupLabel = 'AXIOM team members', showDescription = false }: HoverMemberProps) {
+export function HoverMember({ teamMembers, brandText = 'AXIOM', groupLabel = 'AXIOM team members', showDescription = false, animateText = true }: HoverMemberProps) {
   const rootRef = useRef<HTMLDivElement>(null)
   const cursorRef = useRef<HTMLSpanElement>(null)
   const wordRef = useRef<HTMLDivElement>(null)
-  const activeClearTimerRef = useRef<number | null>(null)
   const currentTextRef = useRef(brandText.toUpperCase())
   const [activeIndex, setActiveIndex] = useState<number | null>(null)
   const [transition, setTransition] = useState<LetterTransition>({
@@ -36,21 +36,6 @@ export function HoverMember({ teamMembers, brandText = 'AXIOM', groupLabel = 'AX
   const activeText = activeIndex === null ? brandText.toUpperCase() : teamMembers[activeIndex]?.name.toUpperCase() ?? brandText.toUpperCase()
   const activeDescription = activeIndex === null ? '' : teamMembers[activeIndex]?.description ?? ''
   const isIdle = transition.from === transition.to
-
-  function cancelActiveClear() {
-    if (activeClearTimerRef.current !== null) {
-      window.clearTimeout(activeClearTimerRef.current)
-      activeClearTimerRef.current = null
-    }
-  }
-
-  function scheduleActiveClear() {
-    cancelActiveClear()
-    activeClearTimerRef.current = window.setTimeout(() => {
-      activeClearTimerRef.current = null
-      setActiveIndex(null)
-    }, 220)
-  }
 
   function positionCursor(cursor: HTMLSpanElement, x: number, y: number) {
     const position = { x, y }
@@ -66,12 +51,16 @@ export function HoverMember({ teamMembers, brandText = 'AXIOM', groupLabel = 'AX
     const from = currentTextRef.current
     if (next === from) return
     currentTextRef.current = next
+    if (!animateText) {
+      setTransition({ from: next, to: next })
+      return
+    }
     setTransition({ from, to: next })
-  }, [activeText])
+  }, [activeText, animateText])
 
   useEffect(() => {
     const word = wordRef.current
-    if (!word || transition.from === transition.to) return
+    if (!word || !animateText || transition.from === transition.to) return
     const previous = word.querySelectorAll<HTMLElement>('.hover-member-old .hover-member-letter')
     const incoming = word.querySelectorAll<HTMLElement>('.hover-member-new .hover-member-letter')
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -109,10 +98,9 @@ export function HoverMember({ teamMembers, brandText = 'AXIOM', groupLabel = 'AX
       stagger: 0.026,
     }, 0.035)
     return () => { timeline.kill() }
-  }, [transition])
+  }, [animateText, transition])
 
   useEffect(() => () => {
-    cancelActiveClear()
     if (cursorRef.current) gsap.killTweensOf(cursorRef.current)
   }, [])
 
@@ -142,10 +130,7 @@ export function HoverMember({ teamMembers, brandText = 'AXIOM', groupLabel = 'AX
       data-active={activeIndex !== null}
       data-card-position={activeIndex === null ? undefined : activeIndex === 1 ? 'validation-top' : activeIndex % 2 === 0 ? 'top-left' : 'top-right'}
       onPointerLeave={(event) => {
-        if (event.pointerType === 'mouse') {
-          cancelActiveClear()
-          setActiveIndex(null)
-        }
+        if (event.pointerType === 'mouse') setActiveIndex(null)
       }}
     >
       <div className="hover-member-avatar-row" role="group" aria-label={groupLabel}>
@@ -155,9 +140,8 @@ export function HoverMember({ teamMembers, brandText = 'AXIOM', groupLabel = 'AX
             type="button"
             key={`${member.name}-${member.image}`}
             aria-label={member.name}
-            onPointerEnter={(event) => { if (event.pointerType === 'mouse') { cancelActiveClear(); setActiveIndex(index); moveCursor(event) } }}
-            onPointerMove={(event) => { if (event.pointerType === 'mouse') { cancelActiveClear(); moveCursor(event) } }}
-            onPointerLeave={(event) => { if (event.pointerType === 'mouse') scheduleActiveClear() }}
+            onPointerEnter={(event) => { if (event.pointerType === 'mouse') { setActiveIndex(index); moveCursor(event) } }}
+            onPointerMove={(event) => { if (event.pointerType === 'mouse') moveCursor(event) }}
             onPointerDown={(event) => selectOnTouch(event, index)}
             onFocus={() => setActiveIndex(index)}
             onBlur={(event) => { if (!event.currentTarget.parentElement?.contains(event.relatedTarget as Node | null)) setActiveIndex(null) }}
@@ -177,8 +161,6 @@ export function HoverMember({ teamMembers, brandText = 'AXIOM', groupLabel = 'AX
         <p
           className="hover-member-description"
           aria-live="polite"
-          onPointerEnter={(event) => { if (event.pointerType === 'mouse') cancelActiveClear() }}
-          onPointerLeave={(event) => { if (event.pointerType === 'mouse') scheduleActiveClear() }}
         >
           {activeDescription}
         </p>

@@ -14,11 +14,11 @@
 .ops-field { display: grid; min-width: min(100%, 180px); flex: 1 1 180px; gap: 5px; color: #748194; font-size: 9px; font-weight: 600; }
 .ops-field input, .ops-field select, .ops-field textarea, .ops-select { width: 100%; min-width: 0; padding: 9px 10px; border: 1px solid #e1e6ec; border-radius: 6px; outline: 0; color: #3e4e62; background: #fff; font-size: 10px; }
 .ops-field textarea { min-height: 80px; resize: vertical; line-height: 1.5; }
-.ops-field input:focus, .ops-field select:focus, .ops-field textarea:focus, .ops-select:focus { border-color: #aab6e4; box-shadow: 0 0 0 3px rgba(76,104,216,.08); }
+.ops-field input:focus, .ops-field select:focus, .ops-field textarea:focus, .ops-select:focus { border-color: #aab1b7; box-shadow: 0 0 0 3px rgba(86,97,108,.1); }
 .ops-button { display: inline-flex; min-height: 36px; align-items: center; justify-content: center; gap: 7px; padding: 0 12px; border: 1px solid #dfe4eb; border-radius: 6px; color: #46566b; background: #fff; font-size: 10px; font-weight: 620; cursor: pointer; }
-.ops-button:hover:not(:disabled) { border-color: #c4cde6; color: var(--accent-deep); background: #fafbff; }
-.ops-button.primary { border-color: #5269ce; color: #fff; background: #5269ce; }
-.ops-button.primary:hover:not(:disabled) { border-color: #4058be; background: #4058be; }
+.ops-button:hover:not(:disabled) { border-color: #c4c9cd; color: var(--accent-deep); background: #f5f6f6; }
+.ops-button.primary { border-color: #424c56; color: #fff; background: #424c56; }
+.ops-button.primary:hover:not(:disabled) { border-color: #252d35; background: #252d35; }
 .ops-button.danger { color: #9b5e50; }
 .ops-button:disabled { cursor: not-allowed; opacity: .58; }
 .ops-button-row { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -50,6 +50,39 @@
 .ops-detail { display: grid; gap: 4px; }
 .ops-detail span { color: #929daa; font-size: 8px; }
 .ops-detail strong { color: #4a5b70; font-size: 9.5px; font-weight: 600; overflow-wrap: anywhere; }
+.rooms-page .ops-record-card { gap: 11px; padding: 16px; border-color: #dfe3e6; color: #28323b; background: linear-gradient(145deg,#fff,#f0f2f3); box-shadow: 0 8px 24px rgba(32,40,49,.07); }
+.rooms-page > .page-header .page-eyebrow { font-size: 11px; }
+.rooms-page > .page-header .page-description { font-size: 14px; }
+.rooms-page > .ops-toolbar .ops-field { font-size: 12px; }
+.rooms-page > .ops-toolbar .ops-field input,
+.rooms-page > .ops-toolbar .ops-field select { min-height: 46px; font-size: 14px; }
+.rooms-page > .ops-toolbar .ops-check-row { font-size: 12px; }
+.rooms-page > .ops-toolbar .ops-button { min-height: 46px; font-size: 12px; }
+.rooms-page > .ops-toolbar { border-color: #dfe3e6; color: #3a444d; background: linear-gradient(130deg,#fff,#eceff1); box-shadow: 0 8px 24px rgba(32,40,49,.07); }
+.rooms-page > .ops-toolbar .ops-field,
+.rooms-page > .ops-toolbar .ops-check-row { color: #59646e; }
+.rooms-page > .ops-toolbar .ops-field input,
+.rooms-page > .ops-toolbar .ops-field select { border-color: #d7dce0; color: #35404a; background: #fff; }
+.rooms-page > .ops-toolbar .ops-field input::placeholder { color: rgba(255,255,255,.72); }
+.rooms-page > .ops-toolbar .ops-field select option { color: #263955; background: #fff; }
+.rooms-page > .ops-toolbar .ops-check-row input { accent-color: #56616c; }
+.rooms-page > .ops-toolbar .ops-button { border-color: #d4d9dd; color: #424d57; background: #fff; }
+.rooms-page > .ops-toolbar .ops-button:hover:not(:disabled) { border-color: #aeb6bd; color: #28323b; background: #f1f3f4; }
+.rooms-page .ops-record-card h3 { color: #28323b; font-size: 14px; }
+.rooms-page .ops-record-card > p { color: #68737d; font-size: 12px; line-height: 1.6; }
+.rooms-page .ops-detail-grid { gap: 12px; }
+.rooms-page .ops-detail { gap: 5px; }
+.rooms-page .ops-detail span { color: #75808a; font-size: 11px; line-height: 1.35; }
+.rooms-page .ops-detail strong { color: #303b44; font-size: 13px; }
+.rooms-page .ops-record-card > header .ops-badge { border-color: #d9dee2; color: #56616b; background: #f0f2f3; }
+.rooms-page .ops-record-card .ops-inline-note { color: #75808a; }
+.rooms-page .ops-fields .ops-field { font-size: 11px; }
+.rooms-page .ops-fields .ops-field { color: #59646e; }
+.rooms-page .ops-fields input { min-height: 42px; border-color: #d7dce0; color: #35404a; background: #fff; font-size: 13px; }
+.rooms-page .ops-fields input::placeholder { color: #8a949d; }
+.rooms-page .ops-fields .ops-button { min-height: 42px; border-color: #424c56; color: #fff; background: #424c56; font-size: 12px; }
+.rooms-page .ops-fields .ops-button:hover:not(:disabled) { border-color: #252d35; color: #fff; background: #252d35; }
+.rooms-page .ops-inline-note { font-size: 11px; }
 .ops-callout { padding: 10px 12px; border-left: 3px solid #8b9ad8; border-radius: 4px; color: #617086; background: #f7f8fc; font-size: 9px; line-height: 1.6; }
 .ops-json { max-height: 310px; overflow: auto; padding: 12px; border: 1px solid #e6e9ee; border-radius: 7px; color: #526278; background: #f9fafb; font: 9px/1.55 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
 .ops-progress { display: inline-flex; align-items: center; gap: 8px; color: #68788b; font-size: 10px; }
@@ -61,11 +94,102 @@
 .ops-calendar-cell { min-width: 0; min-height: 55px; padding: 8px; border-right: 1px solid #e8ebef; border-bottom: 1px solid #e8ebef; color: #8a96a4; background: #fff; font-size: 8px; }
 .ops-calendar-cell.heading { min-height: 39px; color: #536378; background: #fafbfc; font-weight: 700; }
 .ops-calendar-cell.period { color: #738196; background: #fafbfc; font-weight: 650; }
-.ops-calendar-session { display: grid; gap: 3px; margin: 2px 0; padding: 7px; border: 1px solid #dce3f2; border-left: 3px solid #677bd0; border-radius: 5px; color: #52617b; background: #f2f4fa; cursor: pointer; text-align: left; }
+.ops-calendar-session { display: grid; gap: 3px; margin: 2px 0; padding: 7px; border: 1px solid #dfe3e6; border-left: 3px solid #65717c; border-radius: 5px; color: #4d5862; background: #f1f3f4; cursor: pointer; text-align: left; }
 .ops-calendar-session.kind-lab { border-color: #d9e9e2; border-left-color: #4d8a74; background: #f0f7f3; }
 .ops-calendar-session.kind-tutorial { border-color: #eee5d6; border-left-color: #a17e48; background: #faf6ef; }
 .ops-calendar-session strong { font-size: 8.5px; }
 .ops-calendar-session span { color: #77869a; font-size: 7.5px; line-height: 1.4; }
+
+/* Academic weekly timetable */
+.timetable-page .ops-field { font-size: 11px; }
+.timetable-page .ops-field select, .timetable-page .ops-field input { min-height: 40px; padding: 9px 11px; font-size: 12px; }
+.timetable-page .ops-toolbar .ops-button { min-height: 40px; padding-inline: 14px; font-size: 11px; }
+.timetable-page .ops-toolbar .ops-badge { padding: 6px 9px; font-size: 10px; }
+.timetable-page .ops-table { font-size: 12px; }
+.timetable-page .ops-table th { font-size: 10px; }
+.timetable-page .ops-table td { padding: 12px 13px; }
+.academic-timetable-card { padding: 0; overflow: hidden; border-color: #dfe5ec; }
+.academic-grid-heading { margin: 0; padding: 17px 20px 14px; border-bottom: 1px solid #e8edf2; }
+.academic-grid-heading p { color: #7d8998; }
+.academic-grid-heading p.academic-color-key { margin-top: 8px; color: #566b95; font-size: 11px; }
+.academic-week-controls { display: flex; align-items: center; gap: 8px; }
+.academic-week-navigation { display: flex; min-height: 36px; align-items: center; gap: 4px; padding: 3px; border: 1px solid #e1e6ed; border-radius: 7px; background: #fff; }
+.academic-week-navigation button { display: grid; width: 28px; height: 28px; place-items: center; border: 0; border-radius: 5px; color: #65758a; background: transparent; cursor: pointer; }
+.academic-week-navigation button:hover { color: var(--accent-deep); background: #f2f5fb; }
+.academic-week-navigation span { display: flex; min-width: 150px; align-items: center; justify-content: center; gap: 7px; color: #42536a; font-size: 12px; font-weight: 650; white-space: nowrap; }
+.academic-week-navigation span svg { color: #7083c6; }
+.academic-today-button { min-height: 38px; padding: 0 13px; border: 1px solid #dce3ef; border-radius: 6px; color: #5369b7; background: #f8f9fd; font-size: 11px; font-weight: 650; cursor: pointer; }
+.academic-today-button:hover { border-color: #c4cee7; background: #f1f4fc; }
+.academic-grid-scroll { max-width: 100%; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; border: 1px solid #dfe5ec; border-radius: 8px; background: #fff; scrollbar-color: #c4ccd6 #f4f6f8; scrollbar-width: thin; }
+.academic-week-grid { display: grid; grid-template-rows: 60px max-content; border-top: 1px solid #dfe5ec; border-left: 1px solid #dfe5ec; }
+.academic-time-heading { grid-column: 1; grid-row: 1; position: sticky; z-index: 6; left: 0; display: flex; flex-direction: column; justify-content: center; gap: 3px; padding-left: 13px; border-right: 1px solid #dfe5ec; border-bottom: 1px solid #dfe5ec; color: #526278; background: #f5f7fa; font-size: 11px; font-weight: 750; letter-spacing: .1em; }
+.academic-time-heading span { color: #9aa4b0; font-size: 9px; letter-spacing: .12em; }
+.academic-day-headings { grid-column: 2 / -1; grid-row: 1; display: grid; min-height: 60px; background: #f5f7fa; }
+.academic-day-heading { position: relative; display: flex; min-width: 0; align-items: center; justify-content: center; gap: 9px; border-right: 1px solid #dfe5ec; border-bottom: 1px solid #dfe5ec; color: #56667b; background: linear-gradient(180deg,#f7f8fa,#f2f5f8); font-size: 13px; font-weight: 700; letter-spacing: .06em; }
+.academic-day-heading strong { display: grid; width: 32px; height: 32px; place-items: center; border: 1px solid #dfe5ec; border-radius: 50%; color: #526278; background: #fff; font-size: 13px; font-weight: 650; letter-spacing: 0; }
+.academic-day-heading small { color: #8793a1; font-size: 11px; font-weight: 550; }
+.academic-day-heading em { position: absolute; top: 4px; right: 6px; color: #5470c9; font-size: 8px; font-style: normal; font-weight: 750; letter-spacing: .1em; text-transform: uppercase; }
+.academic-day-heading.is-today { background: #eef2fc; }
+.academic-day-heading.is-today strong { border-color: #69747e; color: #fff; background: #56616c; }
+.academic-period-axis { grid-column: 1; grid-row: 2; position: sticky; z-index: 3; left: 0; display: grid; align-self: start; border-right: 1px solid #dfe5ec; background: #f8f9fb; }
+.academic-period-label { display: flex; min-width: 0; flex-direction: column; align-items: flex-start; justify-content: center; gap: 3px; padding: 5px 7px 5px 12px; border-right: 1px solid #dfe5ec; border-bottom: 1px solid #e7ebf0; background: #f8f9fb; }
+.academic-period-label strong { color: #4b5c72; font-size: 12px; font-weight: 750; }
+.academic-period-label span { color: #8491a0; font-size: 10px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.academic-period-label small { color: #a58147; font-size: 8px; font-weight: 750; letter-spacing: .08em; }
+.academic-lunch-axis { display: flex; flex-direction: column; justify-content: center; gap: 2px; padding-left: 9px; border-bottom: 1px solid #dfe5ec; color: #9b8055; background: #f7f2e9; }
+.academic-lunch-axis strong { font-size: 9px; letter-spacing: .07em; }
+.academic-lunch-axis span { font-size: 8px; letter-spacing: .05em; }
+.academic-day-columns { grid-column: 2 / -1; grid-row: 2; display: grid; min-width: 0; }
+.academic-day-track { position: relative; display: grid; min-width: 0; border-right: 1px solid #dfe5ec; isolation: isolate; }
+.academic-day-track.is-today { box-shadow: inset 1px 0 rgba(83,107,192,.12), inset -1px 0 rgba(83,107,192,.12); }
+.academic-period-band { grid-column: 1 / -1; min-width: 0; border-bottom: 1px solid #e7ebf0; background: #fff; }
+.academic-period-band.is-alternate { background: #fcfcfd; }
+.academic-lunch-band { z-index: 0; grid-column: 1 / -1; display: flex; align-items: center; padding-left: 11px; border-bottom: 1px solid #e5dfd1; color: #9b8055; background: repeating-linear-gradient(135deg,#f8f4ec,#f8f4ec 7px,#f4efe4 7px,#f4efe4 14px); }
+.academic-lunch-band span { font-size: 9px; font-weight: 750; letter-spacing: .12em; }
+.academic-session-block { z-index: 1; display: flex; min-width: 0; flex-direction: column; align-items: flex-start; gap: 4px; overflow: hidden; margin: 5px 4px; padding: 9px 9px 8px; border: 1px solid color-mix(in srgb,var(--academic-course-color) 24%,#fff); border-left: 3px solid var(--academic-course-color); border-radius: 5px; color: #33445b; background: color-mix(in srgb,var(--academic-course-color) 8%,#fff); box-shadow: 0 1px 2px rgba(23,39,60,.035); text-align: left; cursor: pointer; transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease, background-color .16s ease; }
+.academic-session-block[data-tone="0"] { --academic-course-color: #53616c; }
+.academic-session-block[data-tone="1"] { --academic-course-color: #4d8273; }
+.academic-session-block[data-tone="2"] { --academic-course-color: #8a7049; }
+.academic-session-block[data-tone="3"] { --academic-course-color: #72618d; }
+.academic-session-block[data-tone="4"] { --academic-course-color: #536f8b; }
+.academic-session-block[data-tone="5"] { --academic-course-color: #a36358; }
+.academic-session-block.kind-lab { border-style: solid; border-left-width: 4px; }
+.academic-session-block.kind-tutorial { border-left-style: double; border-left-width: 4px; }
+.academic-session-block:hover, .academic-session-block:focus-visible { z-index: 4; border-color: var(--academic-course-color); background: color-mix(in srgb,var(--academic-course-color) 13%,#fff); box-shadow: 0 5px 14px rgba(31,47,73,.13); transform: translateY(-1px); outline: none; }
+.academic-session-identifiers { display: flex; width: 100%; min-width: 0; align-items: center; justify-content: space-between; gap: 7px; }
+.academic-session-type { max-width: 100%; overflow: hidden; color: var(--academic-course-color); font-size: 9px; font-weight: 800; letter-spacing: .1em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
+.academic-session-course { display: -webkit-box; max-width: 100%; overflow: hidden; color: #2f4057; font-size: 13px; font-weight: 720; line-height: 1.35; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.academic-session-code { max-width: 100%; overflow: hidden; color: var(--academic-course-color); font: 700 10px/1.3 ui-monospace,SFMono-Regular,Consolas,monospace; text-overflow: ellipsis; white-space: nowrap; }
+.academic-session-meta { display: flex; max-width: 100%; align-items: center; gap: 5px; overflow: hidden; color: #67778c; font-size: 10px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+.academic-session-meta svg { flex: 0 0 auto; color: #8795a8; }
+.academic-session-groups { display: block; max-width: 100%; overflow: hidden; color: #8490a0; font-size: 9px; line-height: 1.3; text-overflow: ellipsis; white-space: nowrap; }
+.academic-day-track[data-lanes="2"] .academic-session-meta, .academic-day-track[data-lanes="2"] .academic-session-groups,
+.academic-day-track[data-lanes="3"] .academic-session-meta, .academic-day-track[data-lanes="3"] .academic-session-groups,
+.academic-day-track[data-lanes="4"] .academic-session-meta, .academic-day-track[data-lanes="4"] .academic-session-groups { display: none; }
+.academic-day-track[data-lanes="2"] .academic-session-block, .academic-day-track[data-lanes="3"] .academic-session-block, .academic-day-track[data-lanes="4"] .academic-session-block { gap: 3px; margin-inline: 3px; padding: 7px 6px; }
+.academic-day-track[data-lanes="3"] .academic-session-course, .academic-day-track[data-lanes="4"] .academic-session-course { font-size: 9px; }
+.academic-day-track[data-lanes]:not([data-lanes="1"]) .academic-session-meta,
+.academic-day-track[data-lanes]:not([data-lanes="1"]) .academic-session-groups { display: none; }
+.academic-day-track[data-lanes]:not([data-lanes="1"]) .academic-session-block { gap: 4px; margin-inline: 3px; padding-inline: 7px; }
+@media (max-width: 760px) {
+  .academic-grid-heading { align-items: flex-start; padding: 14px; }
+  .academic-week-controls { width: 100%; justify-content: space-between; }
+  .academic-week-navigation { min-width: 0; flex: 1; justify-content: space-between; }
+  .academic-week-navigation span { min-width: 0; font-size: 8px; }
+  .timetable-page .ops-field { font-size: 10px; }
+  .timetable-page .ops-field select, .timetable-page .ops-field input { min-height: 38px; font-size: 11px; }
+  .academic-week-grid { grid-template-rows: 56px max-content; }
+  .academic-day-headings { min-height: 56px; }
+  .academic-day-heading { gap: 6px; font-size: 11px; }
+  .academic-day-heading strong { width: 27px; height: 27px; font-size: 11px; }
+  .academic-day-heading em { font-size: 7px; }
+  .academic-period-label { padding-left: 7px; }
+  .academic-lunch-axis { padding-left: 5px; }
+  .academic-session-block { margin: 4px 3px; padding: 7px; }
+  .academic-session-meta, .academic-session-groups { display: none; }
+  .academic-session-course { font-size: 12px; }
+}
+@media (prefers-reduced-motion: reduce) { .academic-session-block { transition: none; } }
 .ops-check-row { display: flex; align-items: center; gap: 8px; color: #6d7c8f; font-size: 9px; }
 .ops-link { color: #4c63c3; font-size: 9px; font-weight: 620; }
 .ops-inline-note { color: #919ca8; font-size: 9px; line-height: 1.5; }
@@ -75,6 +199,96 @@
 .priority-order-rank { color: #929daa; font: 9px ui-monospace, SFMono-Regular, Consolas, monospace; }
 .priority-order-actions { display: flex; gap: 5px; }
 .priority-order-actions .ops-button { min-height: 30px; width: 32px; padding: 0; }
+
+/* Shared AXIOM graphite and paper surfaces across authenticated operational pages. */
+.application-shell .ops-card,
+.application-shell .ops-record-card,
+.application-shell .ops-stat,
+.application-shell .ops-empty {
+  border-color: #e1e5e8;
+  color: #202831;
+  background: linear-gradient(145deg,rgba(255,255,255,.97),rgba(242,244,245,.94));
+  box-shadow: 0 12px 30px rgba(32,40,49,.065);
+}
+.application-shell .ops-card h2,
+.application-shell .ops-card h3,
+.application-shell .ops-record-card h3,
+.application-shell .ops-stat strong,
+.application-shell .ops-empty strong { color: #28323b; }
+.application-shell .ops-card-heading p,
+.application-shell .ops-record-card p,
+.application-shell .ops-stat span,
+.application-shell .ops-stat small,
+.application-shell .ops-empty,
+.application-shell .ops-empty span { color: #737e88; }
+.application-shell .ops-field { color: #59646e; }
+.application-shell .ops-field input,
+.application-shell .ops-field select,
+.application-shell .ops-field textarea,
+.application-shell .ops-select {
+  border-color: #d7dce0;
+  color: #35404a;
+  background: #fff;
+}
+.application-shell .ops-field input::placeholder,
+.application-shell .ops-field textarea::placeholder { color: #8a949d; }
+.application-shell .ops-field select option { color: #35404a; background: #fff; }
+.application-shell .ops-toolbar {
+  border-color: #dfe3e6;
+  color: #3a444d;
+  background: linear-gradient(130deg,#fff,#eceff1);
+  box-shadow: 0 8px 24px rgba(32,40,49,.07);
+}
+.application-shell .ops-toolbar .ops-field,
+.application-shell .ops-toolbar .ops-check-row { color: #59646e; }
+.application-shell .ops-toolbar .ops-field input,
+.application-shell .ops-toolbar .ops-field select,
+.application-shell .ops-toolbar .ops-field textarea {
+  border-color: #d7dce0;
+  color: #35404a;
+  background: #fff;
+}
+.application-shell .ops-toolbar .ops-field select option { color: #35404a; background: #fff; }
+.application-shell .ops-toolbar .ops-button { border-color: #424c56; color: #fff; background: #424c56; }
+.application-shell .ops-toolbar .ops-button:hover:not(:disabled) { border-color: #252d35; color: #fff; background: #252d35; }
+.application-shell .ops-toolbar .ops-button.primary { border-color: #424c56; color: #fff; background: #424c56; }
+.application-shell .ops-table-wrap { border-color: #dfe3e6; background: #fff; }
+.application-shell .ops-table { color: #35414b; background: rgba(255,255,255,.9); }
+.application-shell .ops-table th,
+.application-shell .ops-table td { border-color: #e7eaec; color: #4d5963; }
+.application-shell .ops-table th { color: #59646e; background: #eef0f1; }
+.application-shell .ops-table td strong,
+.application-shell .ops-table td a { color: #28323b; }
+.application-shell .ops-table tbody tr:hover { background: #f1f3f4; }
+.application-shell .ops-card .ops-mono,
+.application-shell .ops-record-card .ops-mono { color: #737e88; }
+.application-shell .ops-card .ops-badge,
+.application-shell .ops-record-card .ops-badge { border-color: #d9dee2; color: #56616b; background: #f0f2f3; }
+.application-shell .ops-card .ops-button,
+.application-shell .ops-record-card .ops-button { border-color: #424c56; color: #fff; background: #424c56; }
+.application-shell .ops-card .ops-button:hover:not(:disabled),
+.application-shell .ops-record-card .ops-button:hover:not(:disabled) { border-color: #252d35; color: #fff; background: #252d35; }
+.application-shell .ops-card h2 { font-size: 17px; }
+.application-shell .ops-card-heading p { font-size: 13px; line-height: 1.6; }
+.application-shell .ops-record-card h3 { font-size: 16px; }
+.application-shell .ops-record-card p { font-size: 13px; line-height: 1.6; }
+.application-shell .ops-stat span { font-size: 12px; }
+.application-shell .ops-stat strong { font-size: 26px; }
+.application-shell .ops-stat small { font-size: 11px; line-height: 1.5; }
+.application-shell .ops-inline-note { color: #69747e; font-size: 12px; line-height: 1.55; }
+.application-shell .ops-link { color: #fff; font-size: 12px; }
+.application-shell .ops-field { font-size: 12px; }
+.application-shell .ops-field input,
+.application-shell .ops-field select,
+.application-shell .ops-field textarea { font-size: 14px; }
+.application-shell .ops-button { font-size: 12px; }
+.application-shell .ops-table { font-size: 12px; }
+.application-shell .ops-table th { font-size: 11px; }
+.application-shell .ops-table th,
+.application-shell .ops-table td { padding: 12px 14px; }
+.application-shell .ops-badge { padding: 5px 9px; font-size: 10px; }
+.application-shell .ops-empty strong { font-size: 14px; }
+.application-shell .ops-empty span { font-size: 12px; line-height: 1.6; }
 @media (max-width: 760px) {
   .ops-card { padding: 14px; }
   .ops-toolbar { align-items: stretch; }

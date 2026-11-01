@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { ChevronDown, CircleUserRound, LogOut } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { roleLabel, useAuth } from '../../auth/AuthContext'
+import { clearAssistantMemorySession } from '../../lib/assistantMemory.mjs'
 
 export function UserProfile() {
   const [isOpen, setIsOpen] = useState(false)
@@ -13,6 +14,7 @@ export function UserProfile() {
     setLogoutError('')
     try {
       await signOut()
+      clearAssistantMemorySession()
       navigate('/', { replace: true })
     } catch {
       setLogoutError('Sign out could not reach AXIOM. Try again.')

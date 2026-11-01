@@ -50,7 +50,7 @@ export function formatMinutes(minutes: number): string {
 
 export function formatSessionTime(session: TimetableSession): string {
   if (session.timeLabel) return session.timeLabel
-  const finalPeriod = session.startPeriod + session.durationPeriods - 1
+  const finalPeriod = session.endPeriod ?? session.startPeriod + session.durationPeriods - 1
   return `P${session.startPeriod}–P${finalPeriod}`
 }
 

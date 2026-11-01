@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
-import { AlertCircle, ArrowDown, ArrowUp, Bot, CornerDownLeft, LoaderCircle, Send } from 'lucide-react'
+import { AlertCircle, ArrowDown, ArrowUp, Bot, CalendarClock, CornerDownLeft, LoaderCircle, Send, Sparkles, TicketCheck } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { PageHeader } from '../components/layout/PageHeader'
 import { parseBooking, parseDisruption, submitBooking } from '../api/resources'
@@ -13,6 +13,9 @@ import { SmoothInput } from '../components/ui/SmoothInput'
 import { SmoothTextarea } from '../components/ui/SmoothTextarea'
 import { SpecularButton } from '../components/ui/SpecularButton'
 import { filterAssistantCommands, getAssistantCommands, type AssistantCommand } from '../components/assistant/assistantCommands'
+import { getAssistantAutocompleteSuggestions } from '../components/assistant/assistantAutocomplete.mjs'
+import { AssistantMemoryPanel } from '../components/assistant/AssistantMemoryPanel'
+import { useAssistantMemory } from '../hooks/useAssistantMemory'
 
 export function AssistantPage() {
   const { selectedDatasetId } = useDatasetContext()
@@ -23,6 +26,7 @@ export function AssistantPage() {
   const [mode, setMode] = useState<'booking' | 'disruption'>('disruption')
   const [message, setMessage] = useState('')
   const [commandsOpen, setCommandsOpen] = useState(false)
+  const [commandsAbove, setCommandsAbove] = useState(false)
   const [activeCommandIndex, setActiveCommandIndex] = useState(0)
   const [requester, setRequester] = useState('Campus coordinator')
   const [role, setRole] = useState<'admin' | 'department_coordinator' | 'faculty' | 'club'>('department_coordinator')
@@ -31,9 +35,34 @@ export function AssistantPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const memory = useAssistantMemory(user?.id, selectedDatasetId, user?.department)
   const commands = useMemo(() => user ? getAssistantCommands(user.role) : [], [user])
   const filteredCommands = useMemo(() => filterAssistantCommands(commands, message), [commands, message])
-  const activeCommand = filteredCommands[activeCommandIndex]
+  const autocomplete = useMemo(() => getAssistantAutocompleteSuggestions(message, mode, user?.role ?? 'faculty', memory.enabled ? memory.items : []), [message, mode, user?.role, memory.enabled, memory.items])
+  const activeSuggestion = autocomplete[activeCommandIndex]
+  const activeCommand = filteredCommands[activeCommandIndex - autocomplete.length]
+  const activeOptionId = activeSuggestion ? `assistant-autocomplete-${activeSuggestion.id}` : activeCommand ? `assistant-command-${activeCommand.id}` : undefined
+
+  useEffect(() => {
+    if (!commandsOpen) return
+    const positionPopover = () => {
+      const root = commandRoot.current
+      if (!root) return
+      const bounds = root.getBoundingClientRect()
+      const below = Math.max(0, window.innerHeight - bounds.bottom - 16)
+      const above = Math.max(0, bounds.top - 16)
+      const openAbove = below < 280 && above > below
+      setCommandsAbove(openAbove)
+      root.style.setProperty('--assistant-popover-max-height', `${Math.max(120, (openAbove ? above : below) - 8)}px`)
+    }
+    positionPopover()
+    window.addEventListener('resize', positionPopover)
+    window.addEventListener('scroll', positionPopover, true)
+    return () => {
+      window.removeEventListener('resize', positionPopover)
+      window.removeEventListener('scroll', positionPopover, true)
+    }
+  }, [commandsOpen, message, mode])
 
   useEffect(() => {
     const onOutsidePointer = (event: PointerEvent) => {
@@ -54,7 +83,16 @@ export function AssistantPage() {
     }
   }, [])
 
-  useEffect(() => { setActiveCommandIndex(0) }, [message])
+  useEffect(() => { setActiveCommandIndex(0) }, [message, mode])
+
+  function chooseAutocomplete(suggestion: typeof autocomplete[number]) {
+    setMode(suggestion.mode)
+    setMessage(suggestion.text)
+    setResult(null)
+    setError('')
+    setCommandsOpen(false)
+    requestAnimationFrame(() => messageInput.current?.focus())
+  }
 
   function chooseCommand(command: AssistantCommand) {
     if (command.type === 'route' && command.href) {
@@ -82,15 +120,21 @@ export function AssistantPage() {
 
   function handleCommandKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
     if (event.key === 'Escape' && commandsOpen) { event.preventDefault(); setCommandsOpen(false); return }
-    if (event.key === 'Tab') { setCommandsOpen(false); return }
-    if (!commandsOpen || !filteredCommands.length) return
+    if (event.key === 'Tab') {
+      if (commandsOpen && activeSuggestion) { event.preventDefault(); chooseAutocomplete(activeSuggestion) }
+      else setCommandsOpen(false)
+      return
+    }
+    const optionCount = autocomplete.length + filteredCommands.length
+    if (!commandsOpen || !optionCount) return
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault()
       const direction = event.key === 'ArrowDown' ? 1 : -1
-      setActiveCommandIndex((index) => (index + direction + filteredCommands.length) % filteredCommands.length)
-    } else if (event.key === 'Enter' && !event.shiftKey && activeCommand) {
+      setActiveCommandIndex((index) => (index + direction + optionCount) % optionCount)
+    } else if (event.key === 'Enter' && !event.shiftKey && (activeSuggestion || activeCommand)) {
       event.preventDefault()
-      chooseCommand(activeCommand)
+      if (activeSuggestion) chooseAutocomplete(activeSuggestion)
+      else if (activeCommand) chooseCommand(activeCommand)
     }
   }
 
@@ -101,7 +145,10 @@ export function AssistantPage() {
   const parse = async () => {
     if (!message.trim()) return
     setLoading(true); setError(''); setNotice(''); setResult(null)
-    try { setResult(mode === 'booking' ? await parseBooking(message, { requester, role, department: department || undefined }) : await parseDisruption(message)) }
+    try {
+      setResult(mode === 'booking' ? await parseBooking(message, { requester, role, department: department || undefined }) : await parseDisruption(message))
+      memory.remember(message, mode)
+    }
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Assistant parsing failed') }
     finally { setLoading(false) }
   }
@@ -112,17 +159,18 @@ export function AssistantPage() {
     setLoading(true); setError('')
     try {
       await submitBooking(selectedDatasetId, data, message, `assistant-${crypto.randomUUID()}`)
+      memory.remember(message, 'booking')
       setNotice('Booking request submitted for deterministic review.'); setResult(null); setMessage('')
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Booking request could not be submitted') }
     finally { setLoading(false) }
   }
   return <div className="ops-page">
     <PageHeader eyebrow="AXIOM ASSISTANT" title="Request assistant" description="Convert natural language into a reviewable structured proposal. The parser does not make scheduling or approval decisions." />
-    <section className="ops-card"><div className="ops-fields">
+    <section className="ops-card"><AssistantMemoryPanel items={memory.items} enabled={memory.enabled} onToggle={memory.setEnabled} onRemove={memory.remove} onClear={memory.clear} /><div className="ops-fields">
       <label className="ops-field">Request type<select value={mode} onChange={(event) => { setMode(event.target.value as typeof mode); setResult(null) }}><option value="disruption">Disruption</option><option value="booking">Booking</option></select></label>
       {mode === 'booking' && <><label className="ops-field">Requester<SmoothInput value={requester} onChange={(event) => setRequester(event.target.value)} /></label><label className="ops-field">Role<select value={role} onChange={(event) => setRole(event.target.value as typeof role)}><option value="department_coordinator">Department coordinator</option><option value="admin">Administrator</option><option value="faculty">Faculty</option><option value="club">Club</option></select></label><label className="ops-field">Department<SmoothInput value={department} onChange={(event) => setDepartment(event.target.value)} placeholder="Optional" /></label></>}
       <label className="ops-field assistant-command-field" style={{ flexBasis: '100%' }}>Describe the request
-        <div className="assistant-command-root" ref={commandRoot}>
+        <div className={`assistant-command-root${commandsAbove ? ' opens-above' : ''}`} ref={commandRoot}>
           <SmoothTextarea
             ref={messageInput}
             value={message}
@@ -134,14 +182,21 @@ export function AssistantPage() {
             aria-autocomplete="list"
             aria-expanded={commandsOpen}
             aria-controls="assistant-command-list"
-            aria-activedescendant={commandsOpen && activeCommand ? `assistant-command-${activeCommand.id}` : undefined}
+            aria-activedescendant={commandsOpen ? activeOptionId : undefined}
           />
           {commandsOpen && <div className="assistant-command-popover" id="assistant-command-list" role="listbox" aria-label="Assistant commands">
+            {autocomplete.length > 0 && <section className="assistant-autocomplete-group" role="group" aria-label="Context-aware completions"><h3><Sparkles size={11} />Complete this request</h3>{autocomplete.map((suggestion, index) => {
+              const isActive = index === activeCommandIndex
+              const Icon = suggestion.icon === 'booking' ? TicketCheck : suggestion.icon === 'disruption' ? AlertCircle : CalendarClock
+              return <div className={`assistant-autocomplete-option${isActive ? ' is-active' : ''}`} id={`assistant-autocomplete-${suggestion.id}`} role="option" aria-selected={isActive} key={suggestion.id} onMouseEnter={() => setActiveCommandIndex(index)} onMouseDown={(event) => event.preventDefault()} onClick={() => chooseAutocomplete(suggestion)}>
+                <span className="assistant-autocomplete-icon"><Icon size={14} /></span><span className="assistant-autocomplete-copy"><strong>{suggestion.text}</strong><small>{suggestion.detail}</small></span><span className="assistant-command-hint">{isActive ? <CornerDownLeft size={13} /> : null}</span>
+              </div>
+            })}</section>}
             {groupedCommands.map(({ group, entries }) => <section className="assistant-command-group" key={group} role="group" aria-label={group}>
               <h3>{group}</h3>
               {entries.map((command) => {
                 const Icon = command.icon
-                const index = filteredCommands.findIndex((entry) => entry.id === command.id)
+                const index = autocomplete.length + filteredCommands.findIndex((entry) => entry.id === command.id)
                 const isActive = index === activeCommandIndex
                 return <div
                   className={`assistant-command-option${isActive ? ' is-active' : ''}`}

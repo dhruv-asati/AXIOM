@@ -46,7 +46,9 @@ export function GreetingIntro({ words, onComplete }: GreetingIntroProps) {
     document.body.style.overflow = 'hidden'
     const tiles = tileGrid.querySelectorAll<HTMLElement>('.greeting-intro-tile')
     const timeline = gsap.timeline({ onComplete: () => onCompleteRef.current() })
-    gsap.set(word, { autoAlpha: 0, y: 0 })
+    // Keep centering in GSAP's transform state so subsequent `y` tweens cannot
+    // overwrite the CSS translate(-50%, -50%) and push the greeting off-center.
+    gsap.set(word, { autoAlpha: 0, xPercent: -50, yPercent: -50, y: 0 })
     timeline.to(tiles, {
       backgroundColor: INTRO_BLUE,
       rotateY: 88,

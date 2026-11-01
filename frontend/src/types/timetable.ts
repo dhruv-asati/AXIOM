@@ -15,6 +15,7 @@ export type TimetableSession = {
   id: string
   day: TimetableDay
   startPeriod: number
+  endPeriod?: number
   durationPeriods: number
   courseCode: string
   courseName: string

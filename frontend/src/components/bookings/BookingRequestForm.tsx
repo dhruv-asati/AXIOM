@@ -3,6 +3,7 @@ import { AlertCircle, CheckCircle2, Send } from 'lucide-react'
 import type { RoomView } from '../../types/venue'
 import { SmoothInput } from '../ui/SmoothInput'
 import { SmoothTextarea } from '../ui/SmoothTextarea'
+import { WheelTimePicker } from '../WheelTimePicker'
 
 type BookingFormValues = { venue: string; date: string; startTime: string; endTime: string; purpose: string; attendance: string; requirements: string }
 type BookingFormErrors = Partial<Record<keyof BookingFormValues, string>>
@@ -12,6 +13,12 @@ function localDateValue() {
   const date = new Date()
   const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
   return local.toISOString().slice(0, 10)
+}
+
+function nextMinute(value: string) {
+  const [hours, minutes] = value.split(':').map(Number)
+  const total = hours * 60 + minutes + 1
+  return total < 1440 ? `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}` : undefined
 }
 
 function isValidCalendarDate(value: string) {
@@ -70,7 +77,7 @@ export function BookingRequestForm({ rooms, unavailable }: BookingRequestFormPro
       <div className="booking-form-grid">
         <label className={`${fieldClass('venue')} booking-field-wide`}><span>Requested venue <b aria-hidden="true">*</b></span><SmoothInput list="booking-venues" value={values.venue} onChange={(event) => update('venue', event.target.value)} placeholder="Room name or ID" aria-invalid={Boolean(errors.venue)} aria-describedby={errors.venue ? 'booking-venue-error' : 'booking-venue-help'} /><datalist id="booking-venues">{roomOptions.map((room) => <option key={room.value} value={room.value}>{room.label}</option>)}</datalist>{errors.venue ? <small id="booking-venue-error">{errors.venue}</small> : <small id="booking-venue-help">Venue selection is confirmed by the booking service.</small>}</label>
         <label className={fieldClass('date')}><span>Booking date <b aria-hidden="true">*</b></span><input type="date" min={localDateValue()} value={values.date} onChange={(event) => update('date', event.target.value)} aria-invalid={Boolean(errors.date)} aria-describedby={errors.date ? 'booking-date-error' : undefined} />{errors.date && <small id="booking-date-error">{errors.date}</small>}</label>
-        <div className="booking-time-group"><label className={fieldClass('startTime')}><span>Start time <b aria-hidden="true">*</b></span><input type="time" value={values.startTime} onChange={(event) => update('startTime', event.target.value)} aria-invalid={Boolean(errors.startTime)} />{errors.startTime && <small>{errors.startTime}</small>}</label><label className={fieldClass('endTime')}><span>End time <b aria-hidden="true">*</b></span><input type="time" value={values.endTime} onChange={(event) => update('endTime', event.target.value)} aria-invalid={Boolean(errors.endTime)} aria-describedby={errors.endTime ? 'booking-end-error' : undefined} />{errors.endTime && <small id="booking-end-error">{errors.endTime}</small>}</label></div>
+        <div className="booking-time-group"><label className={fieldClass('startTime')}><span>Start time <b aria-hidden="true">*</b></span><WheelTimePicker variant="popover" label="Booking start time" value={values.startTime} placeholder="Select start time" onChange={(time) => update('startTime', time)} />{errors.startTime && <small>{errors.startTime}</small>}</label><label className={fieldClass('endTime')}><span>End time <b aria-hidden="true">*</b></span><WheelTimePicker variant="popover" label="Booking end time" value={values.endTime} placeholder="Select end time" minTime={values.startTime ? nextMinute(values.startTime) : undefined} onChange={(time) => update('endTime', time)} />{errors.endTime && <small id="booking-end-error">{errors.endTime}</small>}</label></div>
         <label className={`${fieldClass('purpose')} booking-field-wide`}><span>Event purpose <b aria-hidden="true">*</b></span><SmoothInput value={values.purpose} onChange={(event) => update('purpose', event.target.value)} placeholder="e.g. Department seminar" aria-invalid={Boolean(errors.purpose)} aria-describedby={errors.purpose ? 'booking-purpose-error' : undefined} />{errors.purpose && <small id="booking-purpose-error">{errors.purpose}</small>}</label>
         <label className={fieldClass('attendance')}><span>Expected attendance <b aria-hidden="true">*</b></span><input type="number" min="1" step="1" inputMode="numeric" value={values.attendance} onChange={(event) => update('attendance', event.target.value)} placeholder="e.g. 40" aria-invalid={Boolean(errors.attendance)} aria-describedby={errors.attendance ? 'booking-attendance-error' : undefined} />{errors.attendance && <small id="booking-attendance-error">{errors.attendance}</small>}</label>
         <label className={`${fieldClass('requirements')} booking-field-wide`}><span>Additional requirements <em>Optional</em></span><SmoothTextarea rows={3} value={values.requirements} onChange={(event) => update('requirements', event.target.value)} placeholder="Equipment or setup requirements" /></label>

@@ -10,6 +10,7 @@ import { useDatasetContext } from '../context/DatasetContext'
 import type { BookingRequestRecord, DashboardSummary } from '../types/api'
 import { PageHeader } from '../components/layout/PageHeader'
 import { SpecularCard } from '../components/ui/SpecularCard'
+import { MagicBento } from '../components/ui/MagicBento'
 import './Operations.css'
 
 export function DashboardPage() {
@@ -101,8 +102,8 @@ export function DashboardPage() {
         <SpecularCard as="article" className="ops-stat"><span>Pending requests</span><strong>{currentSummary.booking_counts.pending}</strong><small>For the latest schedule</small></SpecularCard>
       </section>
       <section className="ops-card-grid">
-        <article className="ops-card"><div className="ops-card-heading"><div><h2>Room utilisation</h2><p>{currentSummary.room_utilisation_definition}</p></div><ChartNoAxesCombined size={18} /></div><strong style={{ fontSize: 28 }}>{currentSummary.room_utilisation_percent === null ? '—' : `${currentSummary.room_utilisation_percent}%`}</strong><p className="ops-inline-note">{currentSummary.latest_schedule ? 'Calculated from the latest persisted schedule and room unavailability.' : 'Unavailable until a persisted schedule exists.'}</p></article>
-        <article className="ops-card"><div className="ops-card-heading"><div><h2>Live occupancy</h2><p>Current occupancy requires a real-time room check-in source.</p></div><DoorOpen size={18} /></div><strong style={{ fontSize: 24 }}>Not available</strong><p className="ops-inline-note">AXIOM has recurring weekly assignments, not live occupancy telemetry.</p></article>
+        <MagicBento className="ops-card" tone="spotlight"><div className="ops-card-heading"><div><h2>Room utilisation</h2><p>{currentSummary.room_utilisation_definition}</p></div><ChartNoAxesCombined size={18} /></div><strong style={{ fontSize: 28 }}>{currentSummary.room_utilisation_percent === null ? '—' : `${currentSummary.room_utilisation_percent}%`}</strong><p className="ops-inline-note">{currentSummary.latest_schedule ? 'Calculated from the latest persisted schedule and room unavailability.' : 'Unavailable until a persisted schedule exists.'}</p></MagicBento>
+        <MagicBento className="ops-card" tone="layered"><div className="ops-card-heading"><div><h2>Live occupancy</h2><p>Current occupancy requires a real-time room check-in source.</p></div><DoorOpen size={18} /></div><strong style={{ fontSize: 24 }}>Not available</strong><p className="ops-inline-note">AXIOM has recurring weekly assignments, not live occupancy telemetry.</p></MagicBento>
       </section>
       <section className="ops-card-grid">
         <article className="ops-card"><div className="ops-card-heading"><div><h2>Weekly schedule preview</h2><p>First assignments in the recurring weekly pattern, not live “up next” telemetry.</p></div><AnimatedLink className="ops-link" to="/timetable">Open timetable <ArrowUpRight size={13} /></AnimatedLink></div>

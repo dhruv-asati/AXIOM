@@ -102,7 +102,7 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 
 .main-content { position: relative; z-index: 1; min-height: 100vh; padding: 0 42px; }
 .application-shell:has(.floating-menu-root[data-corner$="right"]) .main-content { padding-right: 98px; }
-.application-shell:has(.floating-menu-root[data-corner$="left"]) .main-content { padding-left: 98px; }
+.application-shell:has(.floating-menu-root[data-corner$="left"]) .main-content { padding-left: 112px; }
 .content-container { width: min(100%, 1120px); margin: 0 auto; padding: 43px 0 64px; }
 .page-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 31px; }
 .page-eyebrow, .section-eyebrow { margin: 0 0 9px; color: #8391a0; font-size: 9px; font-weight: 700; letter-spacing: .15em; }
@@ -170,7 +170,7 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
   .sidebar-bottom .navigation-item { display: flex; }
   .top-navbar, .main-content { padding-right: 30px; padding-left: 30px; }
   .application-shell:has(.floating-menu-root[data-corner$="right"]) .main-content { padding-right: 92px; }
-  .application-shell:has(.floating-menu-root[data-corner$="left"]) .main-content { padding-left: 92px; }
+  .application-shell:has(.floating-menu-root[data-corner$="left"]) .main-content { padding-left: 104px; }
   .workspace-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .intro-orbit { right: 42px; }
 }
@@ -203,7 +203,7 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
   .profile-avatar { width: 32px; height: 32px; }
   .main-content { min-height: 100vh; padding: 0 20px; }
   .application-shell:has(.floating-menu-root[data-corner$="right"]) .main-content { padding-right: 72px; }
-  .application-shell:has(.floating-menu-root[data-corner$="left"]) .main-content { padding-left: 72px; }
+  .application-shell:has(.floating-menu-root[data-corner$="left"]) .main-content { padding-left: 84px; }
   .content-container { padding: 32px 0 46px; }
   .page-header { margin-bottom: 25px; }
   .dashboard-intro { min-height: 220px; padding: 28px 25px; }
@@ -222,7 +222,7 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
   .profile-menu { right: -3px; }
   .main-content { padding-right: 17px; padding-left: 17px; }
   .application-shell:has(.floating-menu-root[data-corner$="right"]) .main-content { padding-right: 68px; }
-  .application-shell:has(.floating-menu-root[data-corner$="left"]) .main-content { padding-left: 68px; }
+  .application-shell:has(.floating-menu-root[data-corner$="left"]) .main-content { padding-left: 80px; }
   .page-header h1 { font-size: 26px; }
   .page-description { font-size: 11px; }
   .dashboard-intro { min-height: 235px; padding: 25px 20px; }
@@ -243,6 +243,48 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
 }
+
+/* Keep the custom booking and disruption panels in the same blue card system. */
+.application-shell .booking-form-panel,
+.application-shell .booking-requests-panel,
+.application-shell .disruption-panel,
+.application-shell .disruption-flow {
+  border-color: #264a91;
+  color: #fff;
+  background: #264a91;
+  box-shadow: 0 8px 24px rgba(38,74,145,.16);
+}
+.application-shell .booking-form-panel h2,
+.application-shell .booking-requests-panel h2,
+.application-shell .disruption-panel-heading h2 { color: #fff; }
+.application-shell .booking-form-panel p,
+.application-shell .booking-requests-panel p,
+.application-shell .booking-form-field,
+.application-shell .booking-form-field > span,
+.application-shell .booking-contract-hint,
+.application-shell .booking-form-disabled-note,
+.application-shell .booking-status-note,
+.application-shell .disruption-panel-heading p,
+.application-shell .disruption-panel-description,
+.application-shell .disruption-panel-footnote { color: rgba(255,255,255,.78); }
+.application-shell .booking-form-field input,
+.application-shell .booking-form-field textarea,
+.application-shell .booking-form-field select,
+.application-shell .disruption-panel input,
+.application-shell .disruption-panel textarea,
+.application-shell .disruption-panel select {
+  border-color: rgba(255,255,255,.48);
+  color: #fff;
+  background: #3d5fbd;
+}
+.application-shell .booking-form-field input::placeholder,
+.application-shell .booking-form-field textarea::placeholder,
+.application-shell .disruption-panel input::placeholder,
+.application-shell .disruption-panel textarea::placeholder { color: rgba(255,255,255,.72); }
+.application-shell .booking-form-field select option,
+.application-shell .disruption-panel select option { color: #263955; background: #fff; }
+.application-shell .booking-requests-panel .ops-table,
+.application-shell .booking-requests-panel .booking-requests-table { color: #263955; }
 
 /* Campus operations overview */
 .campus-dashboard { min-width: 0; }

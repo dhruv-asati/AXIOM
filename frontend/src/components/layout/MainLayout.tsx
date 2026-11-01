@@ -1,11 +1,14 @@
-import { useRef, useState } from 'react'
-import { CircleUserRound, Database, LogOut } from 'lucide-react'
+import { useRef } from 'react'
+import { useState } from 'react'
+import { CircleUserRound, Layers3, LogOut } from 'lucide-react'
 import { useNavigate, Outlet } from 'react-router-dom'
 import { roleLabel, useAuth } from '../../auth/AuthContext'
 import { useDatasetContext } from '../../context/DatasetContext'
 import { FloatingMenu, FloatingMenuPanel, type FloatingMenuItem } from './FloatingMenu'
 import { getNavigationForRole } from './navigation'
 import { SpecularEffectsLayer } from '../ui/SpecularEffectsLayer'
+import { clearAssistantMemorySession } from '../../lib/assistantMemory.mjs'
+import '../ui/MagicBento.css'
 
 export function MainLayout() {
   const { user, signOut } = useAuth()
@@ -18,6 +21,7 @@ export function MainLayout() {
     setLogoutError('')
     try {
       await signOut()
+      clearAssistantMemorySession()
       navigate('/', { replace: true })
     } catch {
       setLogoutError('Sign out could not reach AXIOM. Try again.')
@@ -33,7 +37,7 @@ export function MainLayout() {
   const items: FloatingMenuItem[] = [
     ...roleItems,
     {
-      id: 'dataset', label: 'Active dataset', icon: Database,
+      id: 'dataset', label: 'Active dataset', icon: Layers3,
       panel: <FloatingMenuPanel title="Active dataset">
         <label className="floating-menu-dataset-select">Choose the dataset used across AXIOM
           <select aria-label="Active dataset" value={selectedDatasetId} disabled={datasetsLoading || datasets.length === 0} onChange={(event) => selectDataset(event.target.value)}>
@@ -57,7 +61,6 @@ export function MainLayout() {
     },
     { id: 'sign-out', label: 'Sign out', icon: LogOut, tone: 'danger', onClick: () => void handleSignOut() },
   ]
-
   return (
     <div className="application-shell" ref={shellRef}>
       <SpecularEffectsLayer rootRef={shellRef} />

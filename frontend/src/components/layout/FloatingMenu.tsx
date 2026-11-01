@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
-import { NavLink } from 'react-router-dom'
+import { NavLink, useLocation } from 'react-router-dom'
 import { Menu, X, type LucideIcon } from 'lucide-react'
 import './FloatingMenu.css'
 
 export type FloatingMenuCorner = 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left'
-export const FLOATING_MENU_CORNER: FloatingMenuCorner = 'top-right'
+export const FLOATING_MENU_CORNER: FloatingMenuCorner = 'top-left'
 
 export type FloatingMenuItem = {
   id: string
@@ -20,6 +20,7 @@ export type FloatingMenuItem = {
 
 export function FloatingMenu({ items }: { items: FloatingMenuItem[] }) {
   const rootRef = useRef<HTMLDivElement>(null)
+  const location = useLocation()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [activePanel, setActivePanel] = useState<string | null>(null)
   const menuId = 'axiom-floating-menu'
@@ -81,7 +82,7 @@ export function FloatingMenu({ items }: { items: FloatingMenuItem[] }) {
             const badge = item.badge ? <span className="floating-menu-badge" aria-label={typeof item.badge === 'boolean' ? 'New' : `${item.badge} updates`}>{typeof item.badge === 'boolean' ? '' : item.badge}</span> : null
             const linkClass = ({ isActive }: { isActive: boolean }) => `floating-menu-button${isActive ? ' is-active' : ''}`
             return (
-              <div className={`floating-menu-entry${expanded ? ' is-expanded' : ''}`} key={item.id}>
+              <div className={`floating-menu-entry${expanded ? ' is-expanded' : ''}${item.href && location.pathname === item.href ? ' is-current' : ''}`} key={item.id}>
                 {item.href ? (
                   <NavLink to={item.href} end className={linkClass} aria-label={item.label} aria-describedby={tooltipId} data-menu-entry onClick={closeAfterAction}>
                     <Icon size={23} strokeWidth={1.55} aria-hidden="true" />{badge}

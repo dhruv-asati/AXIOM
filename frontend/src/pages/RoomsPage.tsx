@@ -10,6 +10,8 @@ import './Operations.css'
 import { SkeletonPage, SkeletonCard } from '../components/ui/Skeleton'
 import { useAuth } from '../auth/AuthContext'
 import { SmoothInput } from '../components/ui/SmoothInput'
+import { WheelTimePicker } from '../components/WheelTimePicker'
+import { periodClockSlots, periodClockTime, periodForClockTime } from '../lib/timeSlots'
 
 export function RoomsPage() {
   const { user } = useAuth()
@@ -72,6 +74,7 @@ export function RoomsPage() {
 
   const types = [...new Set(rooms.map((room) => room.room_type))].sort()
   const periods = calendar?.periods.filter((entry) => entry.teaching) ?? []
+  const selectedPeriodTime = periodClockTime(periods.find((entry) => entry.id === Number(period)))
 
   const saveDepartment = async (room: RoomRecord) => {
     if (!selectedDatasetId) return
@@ -84,7 +87,7 @@ export function RoomsPage() {
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Room ownership could not be saved') }
   }
 
-  return <div className="ops-page">
+  return <div className="ops-page rooms-page">
     <PageHeader eyebrow="CAMPUS VENUES" title="Room directory" description="Inspect room features, scheduled period use, and availability from actual room records." />
     <section className="ops-toolbar">
       <label className="ops-field">Schedule for utilisation<select value={scheduleId} onChange={(event) => setScheduleId(event.target.value)}><option value="">No schedule selected</option>{schedules.map((schedule) => <option key={schedule.schedule_id} value={schedule.schedule_id}>{new Date(schedule.created_at).toLocaleString()} · {schedule.status}</option>)}</select></label>
@@ -92,7 +95,7 @@ export function RoomsPage() {
       <label className="ops-field">Minimum capacity<input min="0" type="number" value={minCapacity} onChange={(event) => setMinCapacity(event.target.value)} placeholder="Any" /></label>
       <label className="ops-field">Accessibility<select value={accessible} onChange={(event) => setAccessible(event.target.value)}><option value="">Any</option><option value="true">Accessible</option><option value="false">Not accessible</option></select></label>
       <label className="ops-field">Availability day<select value={day} onChange={(event) => { setDay(event.target.value); setPeriod('') }}><option value="">Not checked</option>{calendar?.days.map((value) => <option key={value}>{value}</option>)}</select></label>
-      <label className="ops-field">Period<select value={period} disabled={!day} onChange={(event) => setPeriod(event.target.value)}><option value="">Select period</option>{periods.map((value) => <option key={value.id} value={value.id}>P{value.id} {value.start ?? ''}</option>)}</select></label>
+      <label className="ops-field">Period time<WheelTimePicker variant="popover" label="Room availability period time" value={selectedPeriodTime} placeholder="Select period time" slots={periodClockSlots(periods)} disabled={!day || periods.length === 0} onChange={(time) => { const match = periodForClockTime(periods, time); if (match) setPeriod(String(match.id)) }} /></label>
       <label className="ops-check-row"><input type="checkbox" checked={availableOnly} disabled={!day || !period} onChange={(event) => setAvailableOnly(event.target.checked)} />Only available at selected slot</label>
       <button className="ops-button" type="button" disabled={loading} onClick={() => void loadRooms(true)}>{loading ? <LoaderCircle size={14} className="is-spinning" /> : <RefreshCw size={14} />}Refresh</button>
     </section>
